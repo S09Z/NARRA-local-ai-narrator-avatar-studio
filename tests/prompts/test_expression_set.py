@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO / "scripts" / "lib"))
 import canon  # noqa: E402
 
 # ASSET_SPEC.md section 6 - the only three expressions defined by an open mouth.
-OPEN_MOUTH = {"excited", "surprised", "explaining"}
+OPEN_MOUTH = canon.OPEN_MOUTH_EXPRESSIONS
 
 
 def compile_expression(name):

@@ -41,16 +41,45 @@ Head height is the fraction of image height from chin to the top of the hair sil
 Consistency *within* a class is what makes assets interchangeable; classes differ from
 each other by design.
 
-| Class          | Used by                    | Head height | Crop bottom      | Status |
-|----------------|----------------------------|-------------|------------------|--------|
-| `close-up`     | reference, expressions, visemes | TBD    | mid-chest        | TBD |
-| `medium`       | poses                      | TBD         | waist            | TBD |
-| `upper-body`   | poses                      | TBD         | hip              | TBD |
-| `three-quarter`| poses                      | TBD         | mid-thigh        | TBD |
+| Class          | Used by                         | Crop bottom | Hands       | Status |
+|----------------|---------------------------------|-------------|-------------|--------|
+| `close-up`     | reference, expressions, visemes | mid-chest   | out of frame | TBD |
+| `medium`       | poses                           | waist       | out of frame | TBD |
+| `upper-body`   | poses                           | hip         | **fully in frame** | TBD |
+| `three-quarter`| poses                           | mid-thigh   | **fully in frame** | TBD |
 
 The reference, all 12 expressions, and all 16 visemes are `close-up` and share one head
 height. Poses may use any class but are internally consistent within it
 (`ASSET_SPEC.md` §8).
+
+Hands are the highest-failure region (`PROMPT_GUIDE.md` §7). A hand cropped at the wrist
+fails QC, so any pose with a visible gesture uses `upper-body` or `three-quarter` and is
+framed with margin around the hands. `close-up` and `medium` keep hands out of frame
+entirely — the two safe states are all in or all out.
+
+### Head height by class
+
+Head height is chin to the top of the hair silhouette, as a fraction of image height.
+
+The **ratio** column is the specification and is fixed now. The **target** column is
+derived from standard figure proportions (roughly 7.5 heads, ~0.25 head of headroom) and
+is an estimate until `close-up` is measured from the approved reference; at that point
+each class's absolute value is `close-up × ratio` and the estimates are replaced.
+
+| Class          | Crop depth (heads from crown) | Ratio to `close-up` | Target | Status |
+|----------------|-------------------------------|---------------------|--------|--------|
+| `close-up`     | ~2.2                          | 1.00                | ~0.41  | TBD    |
+| `medium`       | ~3.2                          | 0.71                | ~0.29  | TBD    |
+| `upper-body`   | ~3.8                          | 0.60                | ~0.25  | TBD    |
+| `three-quarter`| ~4.8                          | 0.48                | ~0.20  | TBD    |
+
+Specifying the ratio rather than the absolute value is what makes camera classes
+definable before the reference exists, and checkable afterwards without re-deriving them
+(`DECISIONS.md` → ADR-014).
+
+Tolerance: head height within a class varies by **≤ 2% of image height** (≤ 20px at 1024).
+Wider than that and two poses in the same class cannot be intercut. Across classes the
+difference is intentional and is not a defect.
 
 ---
 

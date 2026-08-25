@@ -273,5 +273,9 @@ Mandatory fields: `character`, `asset_type`, `asset_name`, `version`, `file`, `r
 `model`, `workflow`, `prompt.master_version`, `prompt.asset_prompt_version`,
 `generation.seed`, `generation.resolution`, `validation.status`, `generated_at`.
 
+Pose assets additionally require `camera_class`, and it must match the class declared by
+the pose prompt (§8). An asset framed differently from the prompt it records is not
+reproducible from its metadata.
+
 Reproducibility rule: an approved asset must be re-creatable from its metadata alone.
 If a field is missing, the asset is not production-locked.

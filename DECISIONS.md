@@ -445,3 +445,95 @@ Impact:
 The check reports SKIP until the anchor is measured in PHASE 4.3, which needs the
 reference image. It applies to visemes only; expression containment would need the eye and
 brow landmarks in `visual-spec.md` §3, which are also unmeasured.
+
+---
+
+## ADR-014 — Camera classes are specified as a ratio to the close-up head height
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`PLAN.md` §5.2 requires four camera classes, and `ASSET_SPEC.md` §8 requires head size to
+be consistent within a class. Head height can only be measured from the approved
+reference, which does not exist yet — but the pose prompts and the framing rules have to
+be written now, and they need the classes to mean something.
+
+Decision:
+Each class is specified by its **ratio to the `close-up` head height** — `medium` 0.71,
+`upper-body` 0.60, `three-quarter` 0.48 — together with a crop line and a hands rule.
+Absolute targets are recorded as derived estimates and are replaced by
+`close-up × ratio` once `close-up` is measured. Tolerance within a class is 2% of image
+height.
+
+Rationale:
+The ratio is the part that is actually a decision; the absolute is a measurement. Writing
+the ratio down now makes the classes definable before the reference exists, and makes them
+verifiable afterwards without re-deriving anything. It also makes an out-of-tolerance pose
+diagnosable: if `upper-body` assets disagree with each other, the class is broken, and if
+they agree with each other but not with `0.60 × close-up`, the estimate was wrong.
+
+The estimates come from standard figure proportions — roughly 7.5 heads tall, ~0.25 head
+of headroom, crop lines at ~2.2 / 3.2 / 3.8 / 4.8 heads from the crown. They are stated as
+estimates in `visual-spec.md` §2 rather than presented as measurements.
+
+Alternatives rejected:
+- Leave head height entirely `TBD` until the reference exists — rejected: the pose prompts
+  would have no framing definition to write against, and four classes that mean nothing
+  are worse than four estimates that can be corrected.
+- Specify absolute pixel heights now — rejected: they would be fiction, and fiction in a
+  spec file is indistinguishable from a measurement six weeks later.
+- Define classes by crop line alone — rejected: two poses can share a crop line and still
+  differ in head size if the camera distance changed, which is exactly the drift §8 exists
+  to prevent.
+
+Impact:
+`visual-spec.md` §2 carries both columns; only the ratio is binding. The `close-up`
+measurement is now a dependency of PHASE 5 QC as well as PHASE 4.3.
+
+---
+
+## ADR-015 — Narrator compositions are validated data, and open-mouth expressions cannot host a viseme track
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`PLAN.md` §5.3 asks for five reusable narrator states. ADR-004 makes expression and viseme
+independent layers composited at animation time, and `ASSET_SPEC.md` §6 defines three
+expressions — `excited`, `surprised`, `explaining` — as carrying an open mouth.
+
+Decision:
+The five states live in `character/compositions/narrator-states.json` as recipes over the
+layers (pose + camera class + expression + mouth mode), validated by
+`scripts/validation/validate_compositions.py`. A state whose mouth is `viseme-track` must
+use a REST-mouth expression; the validator fails any state that composites a viseme track
+over an open-mouth expression. States built on open-mouth expressions declare
+`mouth: static` and are non-speaking beats.
+
+Rationale:
+The constraint is a direct consequence of ADR-004 and was not previously written down
+anywhere: an open-mouth expression has already spent its mouth, so compositing a viseme
+over it renders two mouths. Discovering that in PHASE 8, after the animation engine is
+built around a state table, is exactly the class of failure ADR-001's phase gate exists to
+prevent.
+
+Encoding the states as data rather than prose means the layer combinations are checked
+against the canonical sets now — a state naming a pose that will never be generated fails
+today. It also gives PHASE 8 something to consume directly instead of re-deriving the
+table from a document.
+
+The visible consequence: the `explaining` *state* uses the `friendly` expression, not the
+`explaining` one. That looks like an inconsistency until the rule is understood, so the
+state records the reason inline.
+
+Alternatives rejected:
+- States as a prose section in a runbook — rejected: nothing would check that the poses and
+  expressions they name are canonical, and PHASE 8 would re-key the table by hand.
+- Allow a viseme track over open-mouth expressions and blend — rejected: blending two
+  mouths is a compositing problem invented to avoid a spec decision, and it would need
+  per-pair tuning across 3 × 16 combinations.
+- Generate closed-mouth variants of the three open-mouth expressions — rejected: 15
+  expressions instead of 12, for states that are deliberately non-speaking beats.
+
+Impact:
+Five states validated. `NARRATOR_STATES`, `MOUTH_MODES`, and `OPEN_MOUTH_EXPRESSIONS` live
+in `scripts/lib/canon.py` as the single source of truth.
