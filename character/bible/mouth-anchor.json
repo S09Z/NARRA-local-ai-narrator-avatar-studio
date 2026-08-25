@@ -1,0 +1,23 @@
+{
+  "$comment": "Measured from the approved reference in PHASE 4.3. Values are null until measured - the placeholders in ASSET_SPEC.md section 9 are structure, not measurements. See character/bible/visual-spec.md section 4.",
+  "character": "narra",
+  "status": "unmeasured",
+  "version": 0,
+  "measured_from": "character/reference/narra-reference-master-v1.png",
+  "measured_at": null,
+  "coordinate_space": {
+    "normalized": true,
+    "origin": "top-left",
+    "reference_resolution": [1024, 1024]
+  },
+  "anchor": {
+    "anchor_x": null,
+    "anchor_y": null,
+    "mouth_width": null,
+    "mouth_height": null
+  },
+  "tolerances": {
+    "anchor_drift_max_fraction_of_width": 0.005,
+    "head_vertical_drift_max_fraction_of_height": 0.01
+  }
+}

@@ -52,8 +52,27 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 
 ## Current Status
 
-Phase 0–6: planned.
+Phase 0: not started — no ComfyUI, no models, no GPU environment yet.
+Phase 1: scaffolding complete, blocked on inputs.
+Phase 2–6: planned.
 Phase 7–10: planned, blocked by image-generation gate.
+
+### Phase 1 — Reference Avatar Foundation
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 1.1 Import reference | `character/reference/` importer + spec checks | Ready — **awaiting the reference image** |
+| 1.2 Character bible  | `character/bible/character-bible.md` | Structure complete — identity fields awaiting the reference image |
+| 1.3 Visual spec      | `character/bible/visual-spec.md`, `mouth-anchor.json` | Structure complete — measurements awaiting the reference image |
+| 1.4 Baseline tests   | `tests/assets/phase1-baseline.md` | Protocol written — **blocked on the PHASE 0 gate** |
+
+Two inputs unblock the rest of Phase 1:
+
+1. The canonical reference image (1024x1024 PNG RGBA, transparent background, neutral
+   expression, REST mouth). Import with
+   `python3 scripts/validation/validate_reference.py <file> --import`.
+2. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
+   cannot run without ComfyUI and the Klein 4B models.
 
 ## Decision Log
 
@@ -66,6 +85,14 @@ Context:
 Decision:
 Reason:
 Impact:
+
+### 2026-08-25 — Reference filename, diagnostic seeds
+Context: PHASE 1 implementation surfaced two unspecified details.
+Decision: Reference is `narra-reference-master-v1.png` with a byte-identical `master.png`
+alias (ADR-008). Diagnostic and gate-test generations use seeds 1000–1999 (ADR-009).
+Reason: Version history on the reference without rewriting workflow JSON on every bump;
+diagnostic runs must not share seed space with library assets.
+Impact: Enforced by `scripts/validation/validate_reference.py --check-imported`.
 
 ## Full Decision Records
 

@@ -210,3 +210,71 @@ Alternatives rejected:
 
 Impact:
 `scripts/` holds standalone utilities. A packaged CLI is a PHASE 10 decision.
+
+---
+
+## ADR-008 — Versioned reference master with a stable `master.png` alias
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`PLAN.md` §1.1 and `PROMPT_GUIDE.md` §4 specify the canonical reference as
+`character/reference/master.png`. `ASSET_SPEC.md` §5 requires every asset to carry a
+versioned filename, `<character>-<type>-<name>-v<version>.png`. The two cannot both be
+satisfied by a single file, and PHASE 1.1 has to write something.
+
+Decision:
+Keep both. `narra-reference-master-v1.png` is the real, versioned artifact and carries
+the sidecar metadata. `master.png` is a byte-identical **copy** that workflows and
+prompts may hardcode. `scripts/validation/validate_reference.py --check-imported`
+enforces that the two are identical.
+
+Rationale:
+Version history is a project requirement — a reference bump invalidates the whole asset
+library, so it must be visible in the filename. But ComfyUI workflow JSON hardcodes
+image paths, and rewriting every workflow on a reference bump is exactly the kind of
+churn that produces mixed-reference assets. The alias absorbs the version change in one
+place. A copy rather than a symlink because ComfyUI must resolve the path identically on
+Windows, Linux, and macOS, and Git symlink handling on Windows is a known failure mode.
+
+Alternatives rejected:
+- `master.png` only — rejected: no version history on the single most important asset;
+  a replaced reference would be undetectable after the fact.
+- Versioned file only — rejected: every reference bump becomes a rewrite of every
+  workflow JSON, with silent partial-migration risk.
+- Symlink instead of copy — rejected: unreliable across the platforms this project runs on.
+
+Impact:
+A ~1.5MB duplicate file in the repository, and one enforced invariant. The validator
+fails if the copy drifts, so the duplication cannot silently become a second reference.
+
+---
+
+## ADR-009 — Diagnostic seed range 1000–1999
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`PLAN.md` §2.4 assigns deterministic seed ranges to expressions (10000–10999), visemes
+(20000–20999), and poses (30000–30999). The PHASE 1.4 baseline identity tests and the
+PHASE 2.5 reference-edit tests also need fixed seeds, and have no assigned range.
+
+Decision:
+Diagnostic and gate-test generations use seeds **1000–1999**. PHASE 1.4 baseline tests
+take 1001–1003. These seeds are never used for library assets.
+
+Rationale:
+Gate tests must be re-runnable with the same seed to tell a prompt change from sampling
+noise. Sharing a range with library assets would make a diagnostic run and an approved
+asset indistinguishable in `metadata/generations/`, which breaks the rule that an
+approved asset is reproducible and identifiable from its metadata alone.
+
+Alternatives rejected:
+- Random seeds for diagnostics — rejected: a failed gate test could not be reproduced,
+  which is when reproducibility matters most.
+- Reuse the expression range — rejected: pollutes the library's seed space and makes
+  provenance ambiguous.
+
+Impact:
+`PROMPT_GUIDE.md` §9's seed table gains a fourth row. Diagnostic outputs live in
+`assets/generated/` and are never promoted to `character/`.

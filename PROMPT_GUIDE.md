@@ -256,9 +256,13 @@ Deterministic seed ranges (from `PLAN.md`):
 
 | Asset class | Seed range   |
 |-------------|--------------|
+| Diagnostic  | 1000–1999    |
 | Expression  | 10000–10999  |
 | Viseme      | 20000–20999  |
 | Pose        | 30000–30999  |
+
+Diagnostic seeds cover gate tests (PHASE 1.4, PHASE 2.5) and never produce library
+assets. See `DECISIONS.md` → ADR-009.
 
 Every generation records its compiled prompt and prompt versions in
 `metadata/generations/`. A locked asset must be re-creatable from its metadata alone.
