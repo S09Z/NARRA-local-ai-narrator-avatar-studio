@@ -1,0 +1,114 @@
+# ==========================================================
+# NARRA — Local AI Narrator Avatar Studio
+# Model weights and runtime-generated media are never committed.
+# ==========================================================
+
+# --- Model files --------------------------------------------------
+models/**
+!models/**/.gitkeep
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.gguf
+*.onnx
+*.engine
+*.sft
+
+# --- Generated images ---------------------------------------------
+assets/generated/**
+!assets/generated/.gitkeep
+assets/contact-sheets/**
+!assets/contact-sheets/.gitkeep
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.tiff
+*.psd
+*.exr
+
+# Approved + canonical character assets are committed on explicit approval.
+!character/reference/**
+!character/expressions/**
+!character/visemes/**
+!character/poses/**
+!assets/approved/**
+!docs/**/*.png
+!docs/**/*.jpg
+
+# --- Generated video ----------------------------------------------
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.gif
+
+# --- Audio --------------------------------------------------------
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.aac
+
+# --- ComfyUI runtime / cache --------------------------------------
+ComfyUI/
+comfyui/
+comfy/
+output/
+temp/
+input/
+custom_nodes/
+user/default/
+*.comfy.log
+comfyui.log
+extra_model_paths.yaml
+
+# --- Python -------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Node (tooling only; no app framework in this repo) -----------
+node_modules/
+
+# --- OS -----------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# --- Editors ------------------------------------------------------
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Temporary / local --------------------------------------------
+tmp/
+.tmp/
+scratch/
+*.tmp
+*.bak
+*.log
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
