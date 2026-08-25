@@ -112,10 +112,15 @@ Defaults by kind, so ordinary asset prompts never set it:
 
 | Kind       | `touches`                | Rationale                                    |
 |------------|--------------------------|----------------------------------------------|
-| expression | `eyes, eyebrows, mouth`  | expression is carried by the eyes and brows first (`PROMPT_GUIDE.md` §5) |
+| expression | `eyes, eyebrows`         | expression is carried by the eyes and brows first (`PROMPT_GUIDE.md` §5), and 9 of the 12 keep a REST mouth so visemes composite (`ASSET_SPEC.md` §6) |
 | viseme     | `mouth`                  | a viseme is a mouth shape, nothing else (§6)  |
 | pose       | `camera`                 | a pose selects its camera class (§7)          |
 | diagnostic | *(required, no default)* | proving containment is the point of the test  |
+
+The three expressions `ASSET_SPEC.md` §6 defines as open-mouthed — `excited`,
+`surprised`, `explaining` — declare `touches: eyes, eyebrows, mouth` explicitly. No
+expression touches `camera`: an expression that tilts the head moves the mouth anchor
+with it (`DECISIONS.md` → ADR-012).
 
 Set `preservation: manual` and supply a `## PRESERVATION` block only when a specific
 observed drift mode needs stronger wording; the reason belongs in

@@ -17,13 +17,15 @@ skipped rather than passed.
 """
 
 import argparse
-import hashlib
 import json
 import os
-import struct
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import imagecheck                                            # noqa: E402
+from imagecheck import FAIL, PASS, Report, sha256            # noqa: E402
 
 # NARRA_REPO lets the test suite point the importer at a throwaway tree.
 REPO = Path(os.environ.get("NARRA_REPO", Path(__file__).resolve().parents[2]))
@@ -36,153 +38,7 @@ ALIAS = REF_DIR / "master.png"
 SIDECAR = REF_DIR / f"{CHARACTER}-reference-master-v{VERSION}.json"
 MIRROR = REPO / "metadata" / "generations" / f"{CHARACTER}-reference-master-v{VERSION}.json"
 
-# ASSET_SPEC.md sections 1-4
-REQUIRED_SIZE = (1024, 1024)
-REQUIRED_MODE = "RGBA"
-REQUIRED_BIT_DEPTH = 8
-MAX_SEMI_TRANSPARENT_FRACTION = 0.06   # antialiased silhouette edge only
-MIN_OPAQUE_FRACTION = 0.10             # a character occupies a real part of the frame
-MAX_OPAQUE_FRACTION = 0.95             # ...but is not a full-bleed background
-
-PASS, FAIL, WARN, SKIP = "PASS", "FAIL", "WARN", "SKIP"
-
-PNG_COLOR_TYPES = {0: "L", 2: "RGB", 3: "P", 4: "LA", 6: "RGBA"}
-
-
-class Report:
-    """Accumulates check results and decides the outcome."""
-
-    def __init__(self):
-        self.rows = []
-
-    def add(self, level, name, detail=""):
-        self.rows.append((level, name, detail))
-
-    def failed(self):
-        return any(level == FAIL for level, _, _ in self.rows)
-
-    def render(self):
-        width = max(len(name) for _, name, _ in self.rows)
-        lines = []
-        for level, name, detail in self.rows:
-            line = f"  [{level}] {name.ljust(width)}"
-            if detail:
-                line += f"  {detail}"
-            lines.append(line)
-        return "\n".join(lines)
-
-
-def read_png_header(path):
-    """Return (width, height, bit_depth, mode) from the IHDR chunk, stdlib only."""
-    with path.open("rb") as fh:
-        if fh.read(8) != b"\x89PNG\r\n\x1a\n":
-            return None
-        length, chunk = struct.unpack(">I4s", fh.read(8))
-        if chunk != b"IHDR" or length != 13:
-            return None
-        width, height, bit_depth, color_type = struct.unpack(">IIBB", fh.read(10))
-    return width, height, bit_depth, PNG_COLOR_TYPES.get(color_type, f"?{color_type}")
-
-
-def load_pillow():
-    try:
-        from PIL import Image
-        return Image
-    except ImportError:
-        return None
-
-
-def check_header(path, report):
-    header = read_png_header(path)
-    if header is None:
-        report.add(FAIL, "format/png", "not a PNG file (ASSET_SPEC 3)")
-        return None
-
-    width, height, bit_depth, mode = header
-    report.add(PASS, "format/png", "PNG signature and IHDR present")
-
-    if (width, height) == REQUIRED_SIZE:
-        report.add(PASS, "resolution", f"{width}x{height}")
-    else:
-        report.add(FAIL, "resolution",
-                   f"{width}x{height}, required {REQUIRED_SIZE[0]}x{REQUIRED_SIZE[1]} (ASSET_SPEC 1)")
-
-    if width == height:
-        report.add(PASS, "aspect-ratio", "1:1")
-    else:
-        report.add(FAIL, "aspect-ratio", f"{width}:{height}, required 1:1 (ASSET_SPEC 2)")
-
-    if bit_depth == REQUIRED_BIT_DEPTH:
-        report.add(PASS, "bit-depth", "8 bits per channel")
-    else:
-        report.add(FAIL, "bit-depth", f"{bit_depth}, required 8 (ASSET_SPEC 3)")
-
-    if mode == REQUIRED_MODE:
-        report.add(PASS, "color-mode", "RGBA")
-    else:
-        report.add(FAIL, "color-mode", f"{mode}, required RGBA (ASSET_SPEC 4)")
-
-    return header
-
-
-def check_pixels(path, report):
-    Image = load_pillow()
-    if Image is None:
-        for name in ("alpha/background", "alpha/edge", "alpha/coverage", "color-space"):
-            report.add(SKIP, name, "Pillow not installed - run: pip install Pillow")
-        return
-
-    with Image.open(path) as img:
-        if img.info.get("icc_profile"):
-            report.add(WARN, "color-space",
-                       "embedded ICC profile found - strip it, the pipeline assumes sRGB (ASSET_SPEC 3)")
-        else:
-            report.add(PASS, "color-space", "no embedded ICC profile, assumed sRGB")
-
-        if img.mode != "RGBA":
-            report.add(SKIP, "alpha/background", "image is not RGBA")
-            report.add(SKIP, "alpha/edge", "image is not RGBA")
-            report.add(SKIP, "alpha/coverage", "image is not RGBA")
-            return
-
-        alpha = img.getchannel("A")
-        width, height = img.size
-        corners = [
-            alpha.getpixel((0, 0)),
-            alpha.getpixel((width - 1, 0)),
-            alpha.getpixel((0, height - 1)),
-            alpha.getpixel((width - 1, height - 1)),
-        ]
-        if all(value == 0 for value in corners):
-            report.add(PASS, "alpha/background", "all four corners fully transparent")
-        else:
-            report.add(FAIL, "alpha/background",
-                       f"corner alpha {corners}, expected [0, 0, 0, 0] - background is not "
-                       "transparent (ASSET_SPEC 4)")
-
-        histogram = alpha.histogram()
-        total = float(width * height)
-        transparent = histogram[0]
-        opaque = histogram[255]
-        semi = total - transparent - opaque
-
-        semi_fraction = semi / total
-        if semi_fraction <= MAX_SEMI_TRANSPARENT_FRACTION:
-            report.add(PASS, "alpha/edge", f"{semi_fraction:.2%} semi-transparent")
-        else:
-            report.add(FAIL, "alpha/edge",
-                       f"{semi_fraction:.2%} semi-transparent, max "
-                       f"{MAX_SEMI_TRANSPARENT_FRACTION:.0%} - soft matte or halo "
-                       "from the generation background (ASSET_SPEC 4)")
-
-        opaque_fraction = opaque / total
-        if MIN_OPAQUE_FRACTION <= opaque_fraction <= MAX_OPAQUE_FRACTION:
-            report.add(PASS, "alpha/coverage", f"{opaque_fraction:.1%} of frame opaque")
-        else:
-            report.add(FAIL, "alpha/coverage",
-                       f"{opaque_fraction:.1%} of frame opaque, expected "
-                       f"{MIN_OPAQUE_FRACTION:.0%}-{MAX_OPAQUE_FRACTION:.0%} - "
-                       "cutout is empty or the background was not removed")
+REQUIRED_SIZE = imagecheck.REQUIRED_SIZE
 
 
 def visual_checklist():
@@ -195,14 +51,6 @@ def visual_checklist():
         "Clean alpha edge - no fringe from the generation background",
         "Art style matches the intended library style (character-bible.md section 9)",
     ]
-
-
-def sha256(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as fh:
-        for block in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def build_sidecar(path):
@@ -336,8 +184,8 @@ def main():
         print(f"Validating {target}\n")
 
     if target and target.exists():
-        if check_header(target, report):
-            check_pixels(target, report)
+        if imagecheck.check_header(target, report):
+            imagecheck.check_pixels(target, report)
 
     print(report.render())
 
