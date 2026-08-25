@@ -537,3 +537,126 @@ Alternatives rejected:
 Impact:
 Five states validated. `NARRATOR_STATES`, `MOUTH_MODES`, and `OPEN_MOUTH_EXPRESSIONS` live
 in `scripts/lib/canon.py` as the single source of truth.
+
+---
+
+## ADR-016 — The PHASE 6 gate reads recorded sign-offs, and the baseline is generated
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`PLAN.md` §6 is the hard gate before video: 12 expressions, 16 visemes, 10 poses,
+contact sheets, a resolution lock, a metadata lock, and a production baseline. Through
+PHASE 5 those requirements were checkable only in pieces — `validate_asset.py` judged one
+asset, `--set` counted one set, and whether a person had actually reviewed an asset lived
+nowhere at all. "PHASE 6 passed" was a claim, not a record.
+
+Decision:
+`scripts/validation/lock_library.py` runs the whole gate in one place and, on success,
+writes `metadata/production-lock.json` — every locked asset with its sha256, seed, model,
+workflow, and prompt version. `validate_asset.py --approve "name"` records the human half
+of `ASSET_SPEC.md` §10 into `metadata/validation/`, and the gate refuses any asset whose
+record is not `approved`. Writing the lock is also what mirrors each sidecar into
+`metadata/generations/` (§11) and what generates `docs/production-baseline.md` (§6.5).
+`--verify` re-checks the files against the lock.
+
+Rationale:
+The two halves of QC fail differently. The machine half is cheap and should be re-run
+constantly; the human half is expensive and is worth recording once. Keeping the sign-off
+in a file is what makes the gate mean anything — otherwise the only evidence that anyone
+looked at the 38 assets is that someone said so.
+
+Generating the baseline instead of writing it by hand follows from the same reasoning. A
+hand-maintained baseline is accurate exactly until the first regenerated asset, and its
+inaccuracy is invisible. Derived from the sidecars, it cannot describe a library that does
+not exist, and `--verify` turns a silently edited asset into a failure.
+
+Alternatives rejected:
+- A checklist in a runbook: unenforceable, and the failure mode is a forgotten tick.
+- Trusting `validation.status: approved` in the asset's own sidecar: the sidecar is written
+  by the generator, so approval would be self-certified by the thing under review.
+- Locking by git tag alone: a tag records that a commit happened, not that 38 specific
+  images each passed 20 checks and were signed for.
+
+Impact:
+PHASE 7 is unblocked by `lock_library.py` exiting 0, and by nothing else. Regenerating a
+locked asset invalidates the lock; re-run the gate and re-lock. `docs/production-baseline.md`
+is a generated file and is not edited by hand.
+
+---
+
+## ADR-017 — Upscales are derivatives, kept outside the library
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`ASSET_SPEC.md` §1 allows an optional 2048x2048 upscale of approved assets after the
+PHASE 6 lock, but said nothing about where such a file lives, what it is called, or how it
+is traced back to the master it came from.
+
+Decision:
+An upscale lives in `assets/approved/upscaled/`, is named `<master-stem>-up2048.png`, and
+carries a sidecar recording `derived_from`, `derived_from_sha256`, `resolution`, and
+`upscaler`. It is never an input to a further edit. The gate fails any upscale whose
+`derived_from_sha256` does not match the master currently in the lock.
+
+Rationale:
+The library is the set of assets everything else is derived from, and it is 1024x1024 by
+§1. A 2048 file sitting in `character/` would eventually be picked up as a reference edit
+input, and the resulting asset would be reproducible only from a file that is itself a
+derivative — two generations away from the recorded workflow.
+
+Pinning the master's sha256 is what makes the derivative honest. An upscale whose master
+has since been regenerated is a picture of a character that no longer exists in the
+library, and without the hash nothing would ever say so.
+
+Alternatives rejected:
+- `character/<type>/` with a `-2048` suffix: closer to hand, and that is the problem.
+- No rule until upscaling is actually needed: the check costs nothing while the directory
+  is empty, and writing it afterwards means writing it after the first mistake.
+
+Impact:
+`scripts/validation/lock_library.py` reports SKIP while no upscales exist, and enforces the
+rule as soon as one does. Upscales are recorded in the lock under `upscales`.
+
+---
+
+## ADR-018 — Head drift is measured within a camera class, not against the reference
+Date: 2026-08-25
+Status: accepted
+
+Context:
+`ASSET_SPEC.md` §9 caps head vertical drift at 1% of image height, and `validate_asset.py`
+implemented that by comparing every asset's silhouette against the close-up reference.
+Every pose in the library is `medium` or wider (`docs/workflows/pose-generation.md` §2), so
+the check was measuring the camera move rather than a defect: all 10 poses would have
+failed the PHASE 6 gate, correctly by the letter of the check and wrongly in fact.
+
+Decision:
+Drift against the reference applies to close-up assets — the reference, expressions, and
+visemes. For an asset that records a wider `camera_class`, `validate_asset.py` reports the
+reference comparison as SKIP and requires only that a `mouth_anchor` is recorded, and
+`lock_library.py` instead compares silhouette crown positions *within* each camera class
+against the same 1% tolerance.
+
+Rationale:
+§2 and §8 already say what consistency means for poses: within a camera class, not across
+them. Comparing a three-quarter shot to a close-up asks the wrong question. What has to
+hold is that two `medium` poses can be intercut, and crown position is the part of that a
+script can measure from an alpha channel.
+
+Head *height* — crown to chin — is the value `visual-spec.md` §2 specifies per class, and
+it cannot be measured from alpha alone because nothing in the silhouette separates head
+from body. It stays in the human checklist rather than being approximated.
+
+Alternatives rejected:
+- Per-class reference images: four references, four things to keep consistent, and the
+  character identity contract in ADR-003 splits four ways.
+- Widening the §9 tolerance until poses pass: that would also stop catching real drift in
+  the 28 close-up assets, where the tolerance is doing its job.
+- Face detection to measure true head height: a model dependency, on the QC path, to
+  replace a check a person makes in a second from a contact sheet.
+
+Impact:
+`ASSET_SPEC.md` §9's tolerance is unchanged; where it is applied is now explicit. Poses
+without a recorded `camera_class` still fail §8 in `validate_asset.py`.

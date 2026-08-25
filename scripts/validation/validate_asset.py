@@ -9,6 +9,7 @@ separate so an automated PASS is never mistaken for an approval.
 Usage:
     validate_asset.py <asset.png>              validate one asset
     validate_asset.py <asset.png> --record     also write metadata/validation/<stem>.json
+    validate_asset.py <asset.png> --approve "name"   record a human sign-off
     validate_asset.py --set expression         check a whole set for completeness
 
 Exit code 0 = automated checks passed, 1 = at least one FAIL, 2 = usage error.
@@ -237,8 +238,44 @@ def check_sidecar(path, fields, report):
     return data
 
 
+def anchor_is_measured():
+    """Has PHASE 4.3 run? Until it has, no per-asset anchor can be required."""
+    if not ANCHOR_FILE.exists():
+        return False
+    try:
+        doc = json.loads(ANCHOR_FILE.read_text())
+    except json.JSONDecodeError:
+        return False
+    return (doc.get("status") == "measured"
+            and (doc.get("anchor") or {}).get("anchor_x") is not None)
+
+
 def check_drift(path, data, report):
     """Head and mouth-anchor drift against the reference (ASSET_SPEC 9)."""
+    camera_class = (data or {}).get("camera_class")
+    if camera_class and camera_class != "close-up":
+        # ASSET_SPEC 8: a medium or wider pose is framed differently from the
+        # close-up reference on purpose. Measuring its drift against the reference
+        # would measure the camera move, not a defect - every pose in the library
+        # would fail. Consistency within the camera class is the real requirement,
+        # and it is checked across the class by lock_library.py (visual-spec.md 2).
+        report.add(SKIP, "drift/head",
+                   f"{camera_class} framing - head position is checked within the "
+                   "camera class, not against the close-up reference (ASSET_SPEC 8)")
+        if not anchor_is_measured():
+            report.add(SKIP, "drift/anchor",
+                       "mouth anchor is unmeasured - measured in PHASE 4.3 "
+                       "(character/bible/visual-spec.md 4)")
+        elif ((data or {}).get("mouth_anchor") or {}).get("anchor_x") is None:
+            report.add(FAIL, "drift/anchor",
+                       "asset metadata records no mouth_anchor - the compositor has "
+                       "nowhere to place a viseme (ASSET_SPEC 9)")
+        else:
+            report.add(SKIP, "drift/anchor",
+                       f"{camera_class} framing - the mouth sits elsewhere in the frame "
+                       "by design; the recorded anchor is what the compositor uses")
+        return
+
     master = reference_path()
     if master is None:
         report.add(SKIP, "drift/head", "no reference imported")
@@ -361,9 +398,16 @@ def human_checklist(asset_type):
     return "\n".join(lines)
 
 
-def record(path, fields, report, data):
+def record(path, fields, report, data, reviewer=None, notes=""):
+    """Write the QC result to metadata/validation/ (PHASE 3.4, PHASE 6.1).
+
+    A reviewer name is the human half of ASSET_SPEC 10 - the identity checks a
+    script cannot make. The PHASE 6 gate reads `overall` from this file, so an
+    asset nobody signed for can never be locked.
+    """
     VALIDATION_DIR.mkdir(parents=True, exist_ok=True)
     target = VALIDATION_DIR / f"{path.stem}.json"
+    approved = bool(reviewer) and not report.failed()
     payload = {
         "asset": str(path.relative_to(REPO)) if path.is_relative_to(REPO) else str(path),
         "asset_type": (fields or {}).get("asset_type"),
@@ -378,17 +422,20 @@ def record(path, fields, report, data):
             ],
         },
         "human_review": {
-            "status": "pending",
-            "reviewer": "",
-            "notes": "",
+            "status": "approved" if approved else "pending",
+            "reviewer": reviewer or "",
+            "reviewed_at": (datetime.now(timezone.utc).isoformat(timespec="seconds")
+                            if approved else ""),
+            "notes": notes,
         },
-        "overall": "failed" if report.failed() else "pending-human-review",
+        "overall": ("failed" if report.failed()
+                    else "approved" if approved else "pending-human-review"),
     }
     target.write_text(json.dumps(payload, indent=2) + "\n")
     return target
 
 
-def validate_one(path, do_record):
+def validate_one(path, do_record, reviewer=None, notes=""):
     report = Report()
     print(f"Validating {path}\n")
 
@@ -401,11 +448,14 @@ def validate_one(path, do_record):
 
     print(report.render())
 
-    if do_record:
-        target = record(path, fields, report, data)
+    if do_record or reviewer:
+        target = record(path, fields, report, data, reviewer, notes)
         print(f"\nRecorded: {target.relative_to(REPO)}")
 
     if report.failed():
+        if reviewer:
+            print("\nNot signed off - an asset cannot be approved over a failed "
+                  "automated check.")
         print("\nFAILED - asset does not meet ASSET_SPEC. Regenerate; do not lock it.")
         return 1
 
@@ -413,7 +463,12 @@ def validate_one(path, do_record):
     print("\nAutomated checks passed. NOT an approval - the identity checks in "
           "ASSET_SPEC 10 are visual:\n")
     print(human_checklist(asset_type))
-    print("\nAn asset is APPROVED only when every box above is also ticked.")
+    if reviewer:
+        print(f"\nSigned off by {reviewer} - recorded as approved. The PHASE 6 gate "
+              "will accept this asset.")
+    else:
+        print("\nAn asset is APPROVED only when every box above is also ticked, then "
+              "recorded with --approve.")
     return 0
 
 
@@ -471,11 +526,18 @@ def main():
                         help="write the result to metadata/validation/")
     parser.add_argument("--set", dest="asset_set",
                         help="check a whole set for completeness: expression, viseme, pose")
+    parser.add_argument("--approve", metavar="REVIEWER",
+                        help="record a human sign-off under this reviewer name "
+                             "(implies --record; refused if any check FAILs)")
+    parser.add_argument("--notes", default="", help="reviewer notes to record")
     args = parser.parse_args()
 
     if args.asset_set:
         if args.asset:
             parser.error("--set checks a whole set; do not also name an asset")
+        if args.approve:
+            parser.error("--approve signs off one asset at a time - a set-level sign-off "
+                         "would approve assets nobody looked at")
         return validate_set(args.asset_set)
 
     if not args.asset:
@@ -484,7 +546,7 @@ def main():
         print(f"error: {args.asset} not found", file=sys.stderr)
         return 2
 
-    return validate_one(args.asset, args.record)
+    return validate_one(args.asset, args.record, args.approve, args.notes)
 
 
 if __name__ == "__main__":

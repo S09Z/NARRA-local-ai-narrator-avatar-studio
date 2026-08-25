@@ -11,6 +11,7 @@ else is compared against.
 
 Usage:
     contact_sheet.py --set expression
+    contact_sheet.py --all
     contact_sheet.py --set viseme --out assets/contact-sheets/narra-sheet-visemes-v1.png
     contact_sheet.py a.png b.png --label-from-filename
 
@@ -63,6 +64,11 @@ def set_cells(asset_type):
     return cells
 
 
+def sheet_path(asset_type):
+    """Where the PHASE 6 gate looks for a set's review sheet (ASSET_SPEC 5)."""
+    return SHEET_DIR / f"{canon.CHARACTER}-sheet-{asset_type}s-v1.png"
+
+
 def build(cells, out_path, columns=COLUMNS):
     Image = imagecheck.load_pillow()
     if Image is None:
@@ -101,12 +107,42 @@ def build(cells, out_path, columns=COLUMNS):
     return 0
 
 
+def build_all(columns=COLUMNS, no_reference=False):
+    """PHASE 6.2: one review sheet per set, at the paths the gate checks.
+
+    Every set gets a sheet even when it is incomplete - a sheet of nine expressions
+    is how the tenth gets noticed. An empty set is the one case with nothing to show.
+    """
+    reference = None if no_reference else reference_cell()
+    written, empty = [], []
+    for asset_type in ("expression", "viseme", "pose"):
+        assets = set_cells(asset_type)
+        if not assets:
+            empty.append(asset_type)
+            continue
+        code = build(([reference] if reference else []) + assets,
+                     sheet_path(asset_type), columns)
+        if code != 0:
+            return code
+        written.append(asset_type)
+
+    for asset_type in empty:
+        print(f"skipped {asset_type} - no assets in "
+              f"{ASSET_DIRS[asset_type].relative_to(REPO)}", file=sys.stderr)
+    if not written:
+        print("error: no assets in any set - nothing to review", file=sys.stderr)
+        return 1
+    return 1 if empty else 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a contact sheet for side-by-side asset review (PHASE 3.4).")
     parser.add_argument("assets", nargs="*", type=Path, help="explicit asset PNGs")
     parser.add_argument("--set", dest="asset_set",
                         help="build from a canonical set: expression, viseme, pose")
+    parser.add_argument("--all", action="store_true",
+                        help="build the review sheet for every set (PHASE 6.2)")
     parser.add_argument("--out", type=Path, help="output path")
     parser.add_argument("--columns", type=int, default=COLUMNS)
     parser.add_argument("--no-reference", action="store_true",
@@ -115,10 +151,15 @@ def main():
 
     if args.asset_set and args.assets:
         parser.error("--set builds from a canonical set; do not also name assets")
-    if not args.asset_set and not args.assets:
-        parser.error("name some assets, or use --set")
+    if args.all and (args.asset_set or args.assets or args.out):
+        parser.error("--all builds every set to its default path; use --set for one sheet")
+    if not args.all and not args.asset_set and not args.assets:
+        parser.error("name some assets, or use --set, or --all")
     if args.columns < 1:
         parser.error("--columns must be at least 1")
+
+    if args.all:
+        return build_all(args.columns, args.no_reference)
 
     cells = []
     if not args.no_reference:
@@ -131,7 +172,7 @@ def main():
             print(f"error: unknown set {args.asset_set!r}", file=sys.stderr)
             return 2
         cells.extend(set_cells(args.asset_set))
-        default_out = SHEET_DIR / f"{canon.CHARACTER}-sheet-{args.asset_set}s-v1.png"
+        default_out = sheet_path(args.asset_set)
     else:
         missing = [path for path in args.assets if not path.exists()]
         if missing:

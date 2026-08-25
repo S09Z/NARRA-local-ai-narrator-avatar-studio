@@ -58,7 +58,7 @@ Phase 2: prompt system complete, blocked on the same inputs.
 Phase 3: prompts + QC tooling complete, no assets generated.
 Phase 4: prompts + mapping + QC tooling complete, no assets generated.
 Phase 5: prompts + camera classes + compositions complete, no assets generated.
-Phase 6: planned.
+Phase 6: gate + lock tooling complete, GATE NOT PASSED — 0/38 assets exist.
 Phase 7–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
@@ -130,6 +130,25 @@ No pose asset has been generated. `character/poses/` is empty.
 PLAN §5 defines no QC or lock milestone; those requirements come from ASSET_SPEC §8 and
 §10, and are covered by `validate_asset.py --set pose`.
 
+### Phase 6 — Asset Validation & Production Lock
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 6.1 Completeness | `scripts/validation/lock_library.py` gate, `validate_asset.py --approve` | Complete — **0/38 assets, gate fails on everything** |
+| 6.2 Contact sheet | `contact_sheet.py --all` → three sheets at the paths the gate checks | Complete |
+| 6.3 Resolution lock | 1024 enforced twice (header + recorded resolution); upscale derivative rule | Complete (ADR-017) |
+| 6.4 Metadata lock | `metadata/production-lock.json`, `metadata/generations/` mirror, `--verify` | Complete (ADR-016) |
+| 6.5 Production baseline | `docs/production-baseline.md`, generated from the lock | Complete — currently **NOT LOCKED** |
+| Runbook | `docs/workflows/production-lock.md` | Written — **not run** |
+
+The gate is the only thing that opens PHASE 7. Current output: 8 blocking problems — no
+reference, no measured anchor, three empty sets, three missing sheets.
+
+Two checks were wrong before PHASE 6 and are fixed:
+- every pose is `medium` or wider, so head drift against the close-up reference would have
+  failed all 10; it is now measured within a camera class (ADR-018)
+- a per-asset `mouth_anchor` is only required once the PHASE 4.3 baseline is measured
+
 ## Decision Log
 
 Add dated decisions here.
@@ -194,3 +213,22 @@ Impact: The `explaining` state uses the `friendly` expression, not the `explaini
 
 Dated architectural decisions with rationale and rejected alternatives live in `DECISIONS.md`.
 This file keeps the short-form status; `DECISIONS.md` keeps the reasoning.
+
+### 2026-08-25 — PHASE 6 gate reads recorded sign-offs
+Context: PHASE 6 asks whether 38 assets are complete, correct, reviewed, and reproducible.
+Through PHASE 5 only the machine half was checkable, and only one asset at a time.
+Decision: `lock_library.py` runs the whole gate and writes `metadata/production-lock.json`;
+`validate_asset.py --approve` records the human half; the baseline doc is generated from
+the lock (ADR-016). Upscales are derivatives outside `character/` (ADR-017).
+Reason: an unrecorded review is indistinguishable from no review, and a hand-written
+baseline is stale from the first regeneration.
+Impact: PHASE 7 is unblocked by `lock_library.py` exiting 0 and by nothing else.
+
+### 2026-08-25 — Pose framing is checked within its camera class
+Context: `validate_asset.py` measured head drift against the close-up reference. Every
+pose in the library is `medium` or wider, so all 10 would have failed the PHASE 6 gate.
+Decision: reference drift applies to close-up assets; poses are compared crown-to-crown
+within their camera class against the same 1% tolerance (ADR-018).
+Reason: ASSET_SPEC §2 and §8 already define pose consistency as within-class. Comparing a
+three-quarter shot to a close-up measures the camera move, not a defect.
+Impact: head *height* per class stays a human check — alpha cannot separate head from body.
