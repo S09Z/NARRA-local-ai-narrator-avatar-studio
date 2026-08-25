@@ -263,6 +263,65 @@ def check_drift(path, data, report):
                    "will not composite onto this asset (ASSET_SPEC 9)")
 
 
+def check_containment(path, fields, report):
+    """PHASE 4.5: did the edit stay inside the region it was allowed to touch?
+
+    "Change only the mouth" is the strictest rule in the project and, until now, was
+    only checkable by eye. Diffing the asset against the reference turns it into a
+    measurement: whatever moved either falls inside the recorded edit region or it
+    does not.
+    """
+    asset_type = (fields or {}).get("asset_type")
+    if asset_type != "viseme":
+        report.add(SKIP, "containment/region",
+                   "only visemes have a recorded edit region (PHASE 4.3)")
+        return
+
+    master = reference_path()
+    if master is None:
+        report.add(SKIP, "containment/region", "no reference imported")
+        return
+    if not ANCHOR_FILE.exists():
+        report.add(SKIP, "containment/region", "character/bible/mouth-anchor.json missing")
+        return
+
+    anchor_doc = json.loads(ANCHOR_FILE.read_text())
+    region = anchor_doc.get("edit_region")
+    if anchor_doc.get("status") != "measured" or not region:
+        report.add(SKIP, "containment/region",
+                   "edit region unmeasured - set it with scripts/utilities/measure_anchor.py")
+        return
+
+    result = imagecheck.changed_region(master, path)
+    if result is None:
+        report.add(SKIP, "containment/region", "Pillow not installed, or sizes differ")
+        return
+
+    bbox, fraction = result
+    if bbox is None:
+        report.add(WARN, "containment/region",
+                   "no pixels differ from the reference - this asset is a copy of it")
+        return
+
+    outside = []
+    if bbox["left"] < region["left"]:
+        outside.append(f"left by {(region['left'] - bbox['left']) * 1024:.0f}px")
+    if bbox["top"] < region["top"]:
+        outside.append(f"above by {(region['top'] - bbox['top']) * 1024:.0f}px")
+    if bbox["right"] > region["right"]:
+        outside.append(f"right by {(bbox['right'] - region['right']) * 1024:.0f}px")
+    if bbox["bottom"] > region["bottom"]:
+        outside.append(f"below by {(bbox['bottom'] - region['bottom']) * 1024:.0f}px")
+
+    if outside:
+        report.add(FAIL, "containment/region",
+                   f"the edit escaped the mouth region: {', '.join(outside)}. Something "
+                   "other than the mouth changed (PROMPT_GUIDE.md 6)")
+    else:
+        report.add(PASS, "containment/region",
+                   f"edit confined to the mouth region, {fraction:.2%} of the frame changed")
+
+
 def human_checklist(asset_type):
     groups = ["identity", "render"]
     if asset_type in HUMAN_CHECKLIST:
@@ -310,6 +369,7 @@ def validate_one(path, do_record):
         imagecheck.check_pixels(path, report)
     data = check_sidecar(path, fields, report)
     check_drift(path, data, report)
+    check_containment(path, fields, report)
 
     print(report.render())
 

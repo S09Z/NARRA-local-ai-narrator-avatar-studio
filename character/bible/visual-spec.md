@@ -99,6 +99,23 @@ into `character/bible/mouth-anchor.json`.
 | `mouth_width`  | mouth bounding box width at REST       | TBD   | TBD |
 | `mouth_height` | mouth bounding box height at REST      | TBD   | TBD |
 
+### Permitted edit region
+
+Recorded alongside the anchor as `edit_region` in `mouth-anchor.json`: the normalized box
+the reference-edit workflow may touch, and the box `validate_asset.py` holds a viseme's
+changed pixels inside (`DECISIONS.md` → ADR-013).
+
+| Field    | Meaning                              | Value | Status |
+|----------|--------------------------------------|-------|--------|
+| `left`   | left edge of the mask region         | TBD   | TBD |
+| `top`    | top edge                             | TBD   | TBD |
+| `right`  | right edge                           | TBD   | TBD |
+| `bottom` | bottom edge                          | TBD   | TBD |
+
+It is deliberately asymmetric about the anchor — much taller below than above — because a
+viseme opens the jaw downward. `A` is the maximum drop in the set and needs the room; a
+symmetric box either clips it or reaches the eyes.
+
 Tolerances (`ASSET_SPEC.md` §9) — binding, and independent of how good the mouth looks:
 
 | Tolerance                          | Limit                  | At 1024 |
@@ -205,7 +222,8 @@ landmark detector in this project and adding one is not justified for a single i
 2. Read pixel coordinates for each landmark in §3.
 3. Divide by 1024 and record to 3 decimal places.
 4. Sample §5 colors from flat lit regions; record the sample coordinate with each value.
-5. Copy the four mouth-anchor values into `character/bible/mouth-anchor.json`.
+5. Record the mouth box with `python3 scripts/utilities/measure_anchor.py --box L T R B`,
+   which writes the four anchor values and the `edit_region` into `mouth-anchor.json`.
 6. Set every touched `Status` cell to `LOCKED` and bump this file to v1.0.
 7. Record the version bump in `character-bible.md` §16.
 

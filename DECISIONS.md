@@ -399,3 +399,49 @@ Impact:
 `ASSET_SPEC.md` §6 rows for `confused` and `proud` updated. `confused` is now the hardest
 expression in the set to make legible, since it has only brow asymmetry to work with — if
 it fails the 256px legibility check, the fix is stronger asymmetry, not a head tilt.
+
+---
+
+## ADR-013 — The permitted edit region is recorded, and containment is machine-checked
+Date: 2026-08-25
+Status: accepted
+
+Context:
+"Change only the mouth" is the strictest rule in the project (`PROMPT_GUIDE.md` §6) and,
+through PHASE 3, was only checkable by eye. A viseme that quietly moved an eyebrow would
+pass every automated check, and the failure would surface in PHASE 8 as lip-sync that
+looks subtly wrong across the whole library.
+
+Decision:
+`character/bible/mouth-anchor.json` records an `edit_region` alongside the anchor — the
+normalized box the reference-edit workflow is permitted to touch. `validate_asset.py`
+diffs a viseme against the reference and fails the asset if any changed pixel falls
+outside that box, reporting the overshoot per side in pixels.
+`scripts/utilities/measure_anchor.py` writes both, deriving the region from the measured
+mouth box unless one is given explicitly.
+
+Rationale:
+The diff is the only direct evidence of what an edit actually changed. Prompt wording,
+denoise strength, and mask geometry are all proxies; the changed-pixel bounding box is the
+thing itself. Recording the region rather than inferring it from the anchor also means the
+QC region and the workflow's mask are the same number, so a mask that is too tall fails QC
+instead of silently permitting eye drift.
+
+The region is derived asymmetrically — much taller below the anchor than above — because a
+viseme opens the jaw downward. `A` is the maximum jaw drop in the set; a symmetric box
+either clips it or reaches the eyes.
+
+Alternatives rejected:
+- Infer the permitted region from the anchor at validation time — rejected: the validator
+  and the workflow would then hold independent opinions about the mask, and the
+  disagreement would be invisible.
+- Check the changed-region *centre* instead of its bounds — rejected: an edit that moves
+  an eyebrow and the mouth has a centre between them that can still land inside the mouth
+  region. Bounds catch it; a centre does not.
+- Per-asset manual review only — rejected: sixteen assets, and the failure is a few pixels
+  in a region nobody is looking at.
+
+Impact:
+The check reports SKIP until the anchor is measured in PHASE 4.3, which needs the
+reference image. It applies to visemes only; expression containment would need the eye and
+brow landmarks in `visual-spec.md` §3, which are also unmeasured.

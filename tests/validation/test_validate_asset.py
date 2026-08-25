@@ -250,6 +250,74 @@ class ValidateAssetTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("will not composite", result.stdout)
 
+    # --- containment (PHASE 4.5) -----------------------------------------
+
+    def measured_anchor_with_region(self):
+        self.anchor_file.write_text(json.dumps({
+            "status": "measured",
+            "anchor": {"anchor_x": 0.500, "anchor_y": 0.649,
+                       "mouth_width": 0.137, "mouth_height": 0.068},
+            "edit_region": {"left": 0.377, "top": 0.595,
+                            "right": 0.623, "bottom": 0.826},
+        }, indent=2))
+
+    def make_viseme(self, edit_box, name="MBP", seed=20008):
+        """A viseme is the reference with one region repainted."""
+        path = self.repo / "character" / "visemes" / f"narra-viseme-{name.lower()}-v1.png"
+        with Image.open(self.reference) as base:
+            edited = base.convert("RGBA").copy()
+        ImageDraw.Draw(edited).ellipse(list(edit_box), fill=(120, 60, 60, 255))
+        edited.save(path)
+        self.sidecar_for(path, "viseme", name, seed,
+                         mouth_anchor={"anchor_x": 0.500, "anchor_y": 0.649,
+                                       "mouth_width": 0.137, "mouth_height": 0.068})
+        return path
+
+    def test_containment_skips_for_non_visemes(self):
+        self.measured_anchor_with_region()
+        path = self.make_asset()
+        result = self.run_cli(path)
+        self.assertIn("[SKIP] containment/region", result.stdout)
+
+    def test_containment_skips_while_the_region_is_unmeasured(self):
+        path = self.make_viseme((450, 620, 570, 700))
+        result = self.run_cli(path)
+        self.assertIn("[SKIP] containment/region", result.stdout)
+
+    def test_edit_inside_the_mouth_region_passes(self):
+        self.measured_anchor_with_region()
+        path = self.make_viseme((450, 620, 570, 720))
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("[PASS] containment/region", result.stdout)
+
+    def test_edit_reaching_the_eyes_fails(self):
+        self.measured_anchor_with_region()
+        path = self.make_viseme((450, 380, 570, 700))   # extends well above the mouth
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("escaped the mouth region", result.stdout)
+        self.assertIn("above by", result.stdout)
+
+    def test_edit_wider_than_the_region_fails(self):
+        self.measured_anchor_with_region()
+        path = self.make_viseme((320, 620, 700, 700))
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("left by", result.stdout)
+        self.assertIn("right by", result.stdout)
+
+    def test_asset_identical_to_the_reference_warns(self):
+        self.measured_anchor_with_region()
+        path = self.repo / "character" / "visemes" / "narra-viseme-rest-v1.png"
+        path.write_bytes(self.reference.read_bytes())
+        self.sidecar_for(path, "viseme", "REST", 20000,
+                         mouth_anchor={"anchor_x": 0.500, "anchor_y": 0.649,
+                                       "mouth_width": 0.137, "mouth_height": 0.068})
+        result = self.run_cli(path)
+        self.assertIn("[WARN] containment/region", result.stdout)
+        self.assertIn("copy of it", result.stdout)
+
     # --- recording -------------------------------------------------------
 
     def test_record_writes_a_validation_record(self):

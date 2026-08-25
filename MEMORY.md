@@ -56,7 +56,8 @@ Phase 0: not started — no ComfyUI, no models, no GPU environment yet.
 Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
 Phase 2: prompt system complete, blocked on the same inputs.
 Phase 3: prompts + QC tooling complete, no assets generated.
-Phase 4–6: planned.
+Phase 4: prompts + mapping + QC tooling complete, no assets generated.
+Phase 5–6: planned.
 Phase 7–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
@@ -101,6 +102,21 @@ real generation.
 
 No expression asset has been generated. `character/expressions/` is empty.
 
+### Phase 4 — Thai Viseme System
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 4.1 Canonical set | 16 names, in `scripts/lib/canon.py` | Complete |
+| 4.2 Thai mapping | `docs/thai-viseme/thai-viseme-mapping.md` | Complete — **unreviewed by a Thai speaker** |
+| 4.3 Mouth anchor | `scripts/utilities/measure_anchor.py` | Tooling complete — **anchor unmeasured, needs the reference image** |
+| 4.4 Generation | `prompts/visemes/` × 16, `docs/workflows/viseme-generation.md` | Prompts complete; runbook **blocked, not run** |
+| 4.5 QC | containment check in `validate_asset.py` | Complete — reports SKIP until the anchor is measured |
+| 4.6 Lock | `validate_asset.py --set viseme` | Tooling complete — 0/16 assets exist |
+
+No viseme asset has been generated. `character/visemes/` is empty.
+The Thai mapping needs review by a Thai speaker before PHASE 8 relies on it; `TH` has no
+native Thai phoneme and is expected to be idle in most sentences.
+
 ## Decision Log
 
 Add dated decisions here.
@@ -143,6 +159,14 @@ sys.path insert; `validate_reference.py` and `compile_prompt.py` migrated onto t
 Reason: Two copies of the canonical viseme set would let QC approve an asset the compiler
 could never have produced.
 Impact: No new dependency and no package manifest; ADR-007 still holds.
+
+### 2026-08-25 — Edit containment is measured, not eyeballed
+Context: "Change only the mouth" was only checkable by eye through PHASE 3.
+Decision: Record a permitted `edit_region` with the anchor; diff each viseme against the
+reference and fail it if any changed pixel escapes that box (ADR-013).
+Reason: The changed-pixel bounding box is direct evidence of what an edit touched; prompt
+wording and denoise strength are only proxies for it.
+Impact: Inert until the anchor is measured (PHASE 4.3, needs the reference image).
 
 ## Full Decision Records
 
