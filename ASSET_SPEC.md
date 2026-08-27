@@ -18,6 +18,19 @@ An asset that does not meet this spec does not enter `character/` or `assets/app
 4K generation is not used during iteration. Upscaling is a post-approval step and never
 a substitute for a correct 1024 generation.
 
+An upscale is a **derivative**, not a library asset (`DECISIONS.md` → ADR-017):
+
+| Property | Rule |
+|----------|------|
+| Location | `assets/approved/upscaled/` — never `character/` |
+| Filename | `<approved-master-stem>-up2048.png` |
+| Sidecar  | `derived_from`, `derived_from_sha256`, `resolution`, `upscaler` |
+| Source   | an asset in the production lock, at the sha256 recorded in it |
+| Reuse    | never the input to a further edit — edits start from the 1024 master |
+
+`scripts/validation/lock_library.py` fails the PHASE 6 gate on any upscale that cannot
+name the exact locked master it came from.
+
 ## 2. Aspect Ratio
 
 - Character assets: **1:1 square**.
@@ -82,10 +95,10 @@ Count required for PHASE 6: **12**
 | 5 | serious     | level brows, steady gaze                | REST  |
 | 6 | concerned   | inner brows raised, drawn together      | REST  |
 | 7 | surprised   | wide eyes, high brows                   | open  |
-| 8 | confused    | asymmetric brows, slight head tilt      | REST  |
+| 8 | confused    | strongly asymmetric brows               | REST  |
 | 9 | thinking    | gaze off-camera, one brow raised        | REST  |
 |10 | explaining  | engaged brows, direct gaze              | open  |
-|11 | proud       | lifted chin, relaxed confident brows    | REST  |
+|11 | proud       | relaxed brows, slightly lowered lids    | REST  |
 |12 | embarrassed | averted gaze, raised inner brows        | REST  |
 
 Requirements:
@@ -95,6 +108,9 @@ Requirements:
 - Each expression is visually distinct from every other expression in the set.
 - Expression assets carry a REST mouth unless the table says otherwise, so the viseme
   layer can be composited over them.
+- Head angle, head tilt, and chin position are identical to the reference in every
+  expression. An expression that moves the head moves the mouth anchor with it and fails
+  §9 regardless of how well it reads. See `DECISIONS.md` → ADR-012.
 
 ## 7. Viseme Specification
 
@@ -269,6 +285,10 @@ and mirrored into `metadata/generations/`.
 Mandatory fields: `character`, `asset_type`, `asset_name`, `version`, `file`, `reference`,
 `model`, `workflow`, `prompt.master_version`, `prompt.asset_prompt_version`,
 `generation.seed`, `generation.resolution`, `validation.status`, `generated_at`.
+
+Pose assets additionally require `camera_class`, and it must match the class declared by
+the pose prompt (§8). An asset framed differently from the prompt it records is not
+reproducible from its metadata.
 
 Reproducibility rule: an approved asset must be re-creatable from its metadata alone.
 If a field is missing, the asset is not production-locked.

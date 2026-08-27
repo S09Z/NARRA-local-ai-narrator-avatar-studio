@@ -52,8 +52,103 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 
 ## Current Status
 
-Phase 0–6: planned.
+Phase 0: runbook written (`docs/operations/phase-0-environment-setup.md`), NOT RUN —
+no ComfyUI, no models, no GPU environment yet. Must run on the RTX 5070 machine.
+Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
+Phase 2: prompt system complete, blocked on the same inputs.
+Phase 3: prompts + QC tooling complete, no assets generated.
+Phase 4: prompts + mapping + QC tooling complete, no assets generated.
+Phase 5: prompts + camera classes + compositions complete, no assets generated.
+Phase 6: gate + lock tooling complete, GATE NOT PASSED — 0/38 assets exist.
 Phase 7–10: planned, blocked by image-generation gate.
+
+### Phase 1 — Reference Avatar Foundation
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 1.1 Import reference | `character/reference/` importer + spec checks | Ready — **awaiting the reference image** |
+| 1.2 Character bible  | `character/bible/character-bible.md` | Structure complete — identity fields awaiting the reference image |
+| 1.3 Visual spec      | `character/bible/visual-spec.md`, `mouth-anchor.json` | Structure complete — measurements awaiting the reference image |
+| 1.4 Baseline tests   | `tests/assets/phase1-baseline.md` | Protocol written — **blocked on the PHASE 0 gate** |
+
+Two inputs unblock the rest of Phase 1:
+
+1. The canonical reference image (1024x1024 PNG RGBA, transparent background, neutral
+   expression, REST mouth). Import with
+   `python3 scripts/validation/validate_reference.py <file> --import`.
+2. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
+   cannot run without ComfyUI and the Klein 4B models.
+
+### Phase 2 — Prompt & Character Consistency
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 2.1 Master prompt    | `prompts/master/master-character-v1.0.md` | Structure complete — slots filled from the bible |
+| 2.2 Prompt variables | `prompts/README.md`, `scripts/generation/compile_prompt.py` | Complete |
+| 2.3 Versioning       | filename + header versioning, enforced by `--lint` | Complete |
+| 2.4 Deterministic seeds | seed = range base + canonical index | Complete |
+| 2.5 Reference-edit tests | `tests/assets/phase2-reference-edit.md`, `prompts/diagnostic/` | Prompts written — **blocked on the PHASE 0 and PHASE 1 gates** |
+
+The same two inputs unblock Phase 2. Nothing in Phase 2 has been validated against a
+real generation.
+
+### Phase 3 — Expression System
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 3.1 Canonical set | 12 names, in `scripts/lib/canon.py` | Complete |
+| 3.2 Dedicated prompts | `prompts/expressions/<name>-v1.0.md` × 12 | Complete |
+| 3.3 Generation | `docs/workflows/expression-generation.md` | Runbook written — **blocked, not run** |
+| 3.4 QC | `scripts/validation/validate_asset.py`, `scripts/utilities/contact_sheet.py` | Complete |
+| 3.5 Lock | `validate_asset.py --set expression` | Tooling complete — 0/12 assets exist |
+
+No expression asset has been generated. `character/expressions/` is empty.
+
+### Phase 4 — Thai Viseme System
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 4.1 Canonical set | 16 names, in `scripts/lib/canon.py` | Complete |
+| 4.2 Thai mapping | `docs/thai-viseme/thai-viseme-mapping.md` | Complete — **unreviewed by a Thai speaker** |
+| 4.3 Mouth anchor | `scripts/utilities/measure_anchor.py` | Tooling complete — **anchor unmeasured, needs the reference image** |
+| 4.4 Generation | `prompts/visemes/` × 16, `docs/workflows/viseme-generation.md` | Prompts complete; runbook **blocked, not run** |
+| 4.5 QC | containment check in `validate_asset.py` | Complete — reports SKIP until the anchor is measured |
+| 4.6 Lock | `validate_asset.py --set viseme` | Tooling complete — 0/16 assets exist |
+
+No viseme asset has been generated. `character/visemes/` is empty.
+The Thai mapping needs review by a Thai speaker before PHASE 8 relies on it; `TH` has no
+native Thai phoneme and is expected to be idle in most sentences.
+
+### Phase 5 — Pose & Narrator Asset Library
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 5.1 Pose set | `prompts/poses/<name>-v1.0.md` × 10 | Complete |
+| 5.2 Camera set | `visual-spec.md` §2, `docs/workflows/pose-generation.md` | Complete — head heights are **ratios**; absolutes need the reference |
+| 5.3 Compositions | `character/compositions/narrator-states.json` + validator | Complete |
+
+No pose asset has been generated. `character/poses/` is empty.
+PLAN §5 defines no QC or lock milestone; those requirements come from ASSET_SPEC §8 and
+§10, and are covered by `validate_asset.py --set pose`.
+
+### Phase 6 — Asset Validation & Production Lock
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 6.1 Completeness | `scripts/validation/lock_library.py` gate, `validate_asset.py --approve` | Complete — **0/38 assets, gate fails on everything** |
+| 6.2 Contact sheet | `contact_sheet.py --all` → three sheets at the paths the gate checks | Complete |
+| 6.3 Resolution lock | 1024 enforced twice (header + recorded resolution); upscale derivative rule | Complete (ADR-017) |
+| 6.4 Metadata lock | `metadata/production-lock.json`, `metadata/generations/` mirror, `--verify` | Complete (ADR-016) |
+| 6.5 Production baseline | `docs/production-baseline.md`, generated from the lock | Complete — currently **NOT LOCKED** |
+| Runbook | `docs/workflows/production-lock.md` | Written — **not run** |
+
+The gate is the only thing that opens PHASE 7. Current output: 8 blocking problems — no
+reference, no measured anchor, three empty sets, three missing sheets.
+
+Two checks were wrong before PHASE 6 and are fixed:
+- every pose is `medium` or wider, so head drift against the close-up reference would have
+  failed all 10; it is now measured within a camera class (ADR-018)
+- a per-asset `mouth_anchor` is only required once the PHASE 4.3 baseline is measured
 
 ## Decision Log
 
@@ -67,7 +162,74 @@ Decision:
 Reason:
 Impact:
 
+### 2026-08-25 — Reference filename, diagnostic seeds
+Context: PHASE 1 implementation surfaced two unspecified details.
+Decision: Reference is `narra-reference-master-v1.png` with a byte-identical `master.png`
+alias (ADR-008). Diagnostic and gate-test generations use seeds 1000–1999 (ADR-009).
+Reason: Version history on the reference without rewriting workflow JSON on every bump;
+diagnostic runs must not share seed space with library assets.
+Impact: Enforced by `scripts/validation/validate_reference.py --check-imported`.
+
+### 2026-08-25 — Preservation and negatives are generated
+Context: The fixed PRESERVATION template and negative groups contradict themselves when
+the TASK targets a feature they name.
+Decision: Prompts declare `touches`; the compiler builds the preserved list and filters
+negative terms from it (ADR-010).
+Reason: A self-contradicting prompt produces unstable output that gets blamed on the model.
+Impact: `PROMPT_GUIDE.md` §3 and §8 rewritten. Enforced by `compile_prompt.py --lint`.
+
+### 2026-08-25 — Expressions do not move the head
+Context: ASSET_SPEC §6 described `confused` with a head tilt and `proud` with a lifted chin.
+Decision: Expression assets hold head angle, chin, and (for 9 of 12) the mouth fixed (ADR-012).
+Reason: Moving the head moves the mouth anchor, so any viseme composited onto that asset
+lands in the wrong place and the asset fails the §9 tolerance.
+Impact: ASSET_SPEC §6 amended. `confused` is now carried by brow asymmetry alone.
+
+### 2026-08-25 — Shared helper modules
+Context: A second validator needed the image checks and canonical sets already written.
+Decision: `scripts/lib/canon.py` and `scripts/lib/imagecheck.py`, imported via an explicit
+sys.path insert; `validate_reference.py` and `compile_prompt.py` migrated onto them (ADR-011).
+Reason: Two copies of the canonical viseme set would let QC approve an asset the compiler
+could never have produced.
+Impact: No new dependency and no package manifest; ADR-007 still holds.
+
+### 2026-08-25 — Edit containment is measured, not eyeballed
+Context: "Change only the mouth" was only checkable by eye through PHASE 3.
+Decision: Record a permitted `edit_region` with the anchor; diff each viseme against the
+reference and fail it if any changed pixel escapes that box (ADR-013).
+Reason: The changed-pixel bounding box is direct evidence of what an edit touched; prompt
+wording and denoise strength are only proxies for it.
+Impact: Inert until the anchor is measured (PHASE 4.3, needs the reference image).
+
+### 2026-08-25 — Camera classes are ratios, compositions are data
+Context: PHASE 5 needed camera classes defined before the reference exists, and five
+reusable narrator states.
+Decision: Classes are specified as a ratio to the close-up head height (ADR-014). States
+live in `character/compositions/narrator-states.json` and are validated (ADR-015).
+Reason: The ratio is the decision, the absolute is a measurement. And an open-mouth
+expression cannot host a viseme track — it would render two mouths.
+Impact: The `explaining` state uses the `friendly` expression, not the `explaining` one.
+
 ## Full Decision Records
 
 Dated architectural decisions with rationale and rejected alternatives live in `DECISIONS.md`.
 This file keeps the short-form status; `DECISIONS.md` keeps the reasoning.
+
+### 2026-08-25 — PHASE 6 gate reads recorded sign-offs
+Context: PHASE 6 asks whether 38 assets are complete, correct, reviewed, and reproducible.
+Through PHASE 5 only the machine half was checkable, and only one asset at a time.
+Decision: `lock_library.py` runs the whole gate and writes `metadata/production-lock.json`;
+`validate_asset.py --approve` records the human half; the baseline doc is generated from
+the lock (ADR-016). Upscales are derivatives outside `character/` (ADR-017).
+Reason: an unrecorded review is indistinguishable from no review, and a hand-written
+baseline is stale from the first regeneration.
+Impact: PHASE 7 is unblocked by `lock_library.py` exiting 0 and by nothing else.
+
+### 2026-08-25 — Pose framing is checked within its camera class
+Context: `validate_asset.py` measured head drift against the close-up reference. Every
+pose in the library is `medium` or wider, so all 10 would have failed the PHASE 6 gate.
+Decision: reference drift applies to close-up assets; poses are compared crown-to-crown
+within their camera class against the same 1% tolerance (ADR-018).
+Reason: ASSET_SPEC §2 and §8 already define pose consistency as within-class. Comparing a
+three-quarter shot to a close-up measures the camera move, not a defect.
+Impact: head *height* per class stays a human check — alpha cannot separate head from body.
