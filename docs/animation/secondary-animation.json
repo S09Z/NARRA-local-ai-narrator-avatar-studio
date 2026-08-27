@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "phase": "8.4",
+  "note": "Procedural idle motion. PLAN 8.4 lists blinking, breathing, subtle head movement, and eyebrow movement. These are emitted as normalized keyframe tracks, not as asset swaps - the library has no eye, brow, or head assets, only 12 full-face expressions. PHASE 9 binds these tracks to GSAP transforms; PHASE 8 decides only what moves and when.",
+
+  "deterministic_note": "All jitter is derived from the source timeline's digest, so the same narration always produces the same idle motion. The image pipeline locks a seed; this is the same contract.",
+
+  "blink": {
+    "mean_interval_s": 4.0,
+    "jitter_s": 1.5,
+    "duration_s": 0.12,
+    "edge_margin_s": 0.2,
+    "prefer_silence": true,
+    "prefer_silence_note": "A blink lands more naturally in a pause than mid-syllable, so REST spans are preferred when one is near the scheduled time.",
+    "render_requires": "an eye region, which ASSET_SPEC does not define. See docs/animation/phase-8-lipsync-engine.md section 6 - this is a real gap in the asset spec, not an oversight here."
+  },
+
+  "breath": {
+    "period_s": 4.0,
+    "amplitude": 0.015,
+    "axis": "scale_y",
+    "note": "A slow chest rise. Amplitude is a fraction of frame height; at 1024 this is about 15px of total travel."
+  },
+
+  "head_sway": {
+    "period_x_s": 7.0,
+    "period_y_s": 11.0,
+    "amplitude_x": 0.004,
+    "amplitude_y": 0.003,
+    "note": "Two out-of-phase sines with coprime-ish periods so the motion does not visibly loop. ADR-012 keeps the head still WITHIN an asset; this moves the whole composited frame, which does not disturb the mouth anchor relative to the face."
+  },
+
+  "brow": {
+    "accent_duration_s": 0.35,
+    "amplitude": 0.6,
+    "on_expression_change": true,
+    "note": "A brow accent on each expression change, which is where a real face punctuates. Not a continuous track."
+  }
+}

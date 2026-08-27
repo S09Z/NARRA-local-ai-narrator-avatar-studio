@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "phase": "8.2",
+  "note": "How one viseme becomes the next. PLAN 8.2 asks for smooth transitions using previous/current/next; the rules below come from docs/thai-viseme/thai-viseme-mapping.md sections 2, 3 and 6, which describe what Thai articulation actually does. Values are tunable; the rules they express are not arbitrary.",
+
+  "fps_default": 25,
+
+  "blend_ms": 60,
+  "blend_note": "Symmetric crossfade centred on the boundary between two visemes. Clamped to half the shorter neighbour so a brief event is never more transition than shape.",
+
+  "min_frames_on_screen": 2,
+  "min_frames_note": "mapping.md section 6 forbids a viseme held for one frame - it reads as a flicker. PHASE 7 enforced this in seconds without knowing the frame rate; PHASE 8 knows it, so the rule is restated in frames, which is what actually reaches the eye.",
+
+  "closure_visemes": ["MBP"],
+  "closure_note": "mapping.md section 5 - /b p pʰ m/ all collapse to MBP, and CLAUDE.md requires MBP to be visually distinct from REST. A bilabial that never fully closes reads as the wrong consonant, so MBP must reach full weight on at least one frame or the animation is wrong.",
+
+  "unreleased_finals": ["p̚", "t̚", "k̚"],
+  "unreleased_note": "mapping.md section 3 - Thai final stops are unreleased: the mouth closes and holds, it does not pop open again. Animating a release frame is named there as the most common way to make Thai lip-sync look foreign. The transition out of one of these is pushed AFTER the boundary so the closure holds for its whole event, instead of being crossfaded away from halfway through.",
+
+  "rounded_visemes": ["U", "O", "AO"],
+  "anticipatory_blend_ms": 90,
+  "anticipatory_note": "mapping.md section 6 - /k/ before /u/ is already rounding. The lips begin rounding during the preceding consonant, so a rounded vowel reaches backwards further than a normal blend.",
+
+  "max_simultaneous_layers": 2,
+  "max_simultaneous_note": "Two shapes blend; three is mud. A diphthong is already two events from PHASE 7, so it needs no extra room here.",
+
+  "idle_viseme": "REST"
+}
