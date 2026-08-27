@@ -660,3 +660,204 @@ Alternatives rejected:
 Impact:
 `ASSET_SPEC.md` §9's tolerance is unchanged; where it is applied is now explicit. Poses
 without a recorded `camera_class` still fail §8 in `validate_asset.py`.
+
+---
+
+## ADR-019 — The viseme mapping is prose and data, checked against each other
+Date: 2026-08-27
+Status: accepted
+
+Context:
+`docs/thai-viseme/thai-viseme-mapping.md` (PHASE 4.2) is a markdown table with the
+reasoning attached — which phonemes look alike from the front, why `TH` is near-dead in
+Thai, which rows a native speaker is most likely to correct. PHASE 7.3 needs the same
+mapping as something a program can index into. Parsing the markdown at runtime would make
+a prose edit able to break the pipeline; keeping only JSON would leave the reasoning
+nowhere, and the reasoning is the part a Thai speaker reviews.
+
+Decision:
+Both. `thai-viseme-map.json` is what `scripts/lib/viseme_map.py` reads.
+`thai-viseme-mapping.md` stays the prose and the review surface. `tests/audio/
+test_viseme_map.py` parses the markdown tables and asserts every row matches the JSON, in
+both directions.
+
+Rationale:
+Two copies of a mapping drift the moment one is edited. That is the same failure ADR-011
+addressed for the canonical sets, and it is worse here: the markdown is what gets
+reviewed, so a JSON that has drifted from it is a mapping nobody has actually approved.
+A test is cheaper than either a runtime markdown parser or a lost rationale.
+
+Alternatives rejected:
+- Parse the markdown at runtime: a table-formatting change would become a pipeline
+  outage, and the prose could no longer be edited freely.
+- JSON only, prose deleted: throws away the ⚠ markers that tell a reviewer where to look.
+- Generate the markdown from the JSON: the interesting content is the reasoning, which
+  cannot be generated from a lookup table.
+
+Impact:
+Edit both files or neither. The `reviewed_by_thai_speaker` flag lives in the JSON, is
+copied into every timeline, and is surfaced as a WARN on every validation run until it
+becomes true.
+
+---
+
+## ADR-020 — G2P exceptions live in a lexicon, not in the rules
+Date: 2026-08-27
+Status: accepted
+
+Context:
+Thai spelling underdetermines pronunciation. A consonant between two vowels can be the
+coda of one syllable or the onset of the next and both readings are legal — ดีครับ is
+/diː.kʰrap/, not /diːk.rap/, and nothing in the orthography says so. Scoring the whole
+segmentation fixes the common cases; loanwords, irregular readings, and compounds that
+resyllabify need a dictionary the repository does not have.
+
+Decision:
+`scripts/lib/thai_g2p.py` scores candidate segmentations and penalises the readings that
+are usually wrong. Where that still fails, `docs/audio/thai-lexicon.json` maps a surface
+form to explicit IPA syllables and outranks any rule reading. The shipped file has 20
+entries seeded from errors found while building PHASE 7.
+
+Rationale:
+Every fix that goes into the rules to repair one word risks breaking another, and the
+damage is invisible without a corpus. A lexicon entry is scoped to exactly one word, is
+data rather than code, and can be added by anyone who notices a mistake — no Python, no
+test archaeology. It is also the natural upgrade path: a pythainlp dictionary can
+populate it later.
+
+Alternatives rejected:
+- Special-case the rules per word: unbounded interaction between fixes.
+- Require pythainlp: violates ADR-007, and makes the pipeline unrunnable on a machine
+  that cannot install it.
+- Accept the errors: a wrong parse becomes numbers in a JSON file and is invisible from
+  then on.
+
+Impact:
+`build_timeline.py --report` is the intended way to find lexicon candidates, and the
+runbook says so. Coverage and unparsed characters are recorded in every timeline;
+below 95% coverage the build exits non-zero.
+
+---
+
+## ADR-021 — TTS and G2P engines are adapters, not dependencies
+Date: 2026-08-27
+Status: accepted
+
+Context:
+PLAN 7.1 asks for a Thai TTS engine and 7.2 for a phoneme approach, without naming
+either. The right answer differs by machine: the production target is an RTX 5070 box
+that does not exist yet, while the work is being done on a Mac. ADR-007 rules out a
+package manifest, so a hard dependency on any engine is not available anyway.
+
+Decision:
+Both are registries. `tts.py` ships `say` (macOS, Thai voice Kanya, verified
+byte-deterministic) as the development engine and `silence` (a silent WAV of the
+estimated length) so tests and CI run anywhere. `thai_g2p.phonemize()` takes an engine
+name and defaults to the built-in parser. Selecting the production TTS engine is
+deferred to when the target machine exists; the criteria are recorded in
+`docs/audio/phase-7-audio-pipeline.md` §2.
+
+Rationale:
+Choosing an engine now would be choosing it on the wrong hardware, and the choice is not
+reversible for free — it decides whether a forced aligner is needed at all, since an
+engine that emits its own phoneme timings upgrades `timing_source` from `fitted` to
+`aligned` with no extra dependency. Every timeline records which engine made its audio,
+so the decision stays visible in the artefacts rather than only in a document.
+
+Alternatives rejected:
+- Pick a neural TTS now: unverifiable on this machine, and it would share 12GB of VRAM
+  with FLUX.
+- Cloud TTS: CLAUDE.md is local-first throughout; this would be the first exception.
+- No TTS until PHASE 6 passes: leaves 7.4 untestable against real audio, when a real
+  Thai voice was available at zero cost.
+
+Impact:
+`silence` is not speech and must never be mistaken for it — it is labelled in the
+metadata it writes. macOS `say` is a development engine and is not the production
+answer.
+
+---
+
+## ADR-022 — A timeline records how its times were made
+Date: 2026-08-27
+Status: accepted
+
+Context:
+PHASE 7 can produce times three ways: a duration model with no audio at all, the same
+model scaled so its total matches a measured WAV, or a real forced alignment. The three
+are not equally trustworthy, and they are indistinguishable once written as numbers.
+PHASE 8 will consume them without knowing which happened.
+
+Decision:
+Every timeline carries `timing_source` — `estimated`, `fitted`, or `aligned` — plus the
+duration model version, the scale factor applied, the G2P coverage, and a `digest` over
+the events and inputs that excludes the timestamp. Nothing writes `aligned` yet; the
+value exists so the distinction cannot be lost later. `validate_timeline.py` warns on
+`estimated`.
+
+Rationale:
+This is the same rule the image pipeline already lives by: an asset records the seed,
+model, and prompt that produced it, and an unrecorded review is indistinguishable from
+no review (ADR-016). A guessed time that looks like a measured one is the audio version
+of that failure. The digest gives audio the property seeds give images — the same input
+is recognisably the same output, and a hand-edited file is detectable.
+
+Alternatives rejected:
+- Emit times with no provenance: PHASE 8 would have to guess, or trust everything
+  equally.
+- Refuse to emit anything without alignment: blocks all downstream work on a dependency
+  that may not be worth its cost.
+- A boolean `estimated` flag: cannot express `aligned`, which is the state this is
+  ultimately heading for.
+
+Impact:
+`absorbed_events` records every viseme dropped for being too short to read, so the
+flicker rule (mapping.md §6) cannot quietly change the animation. Timings sum to the
+audio duration exactly through every transformation.
+
+---
+
+## ADR-023 — PHASE 7 was built before the PHASE 6 gate passed
+Date: 2026-08-27
+Status: accepted
+
+Context:
+`PLAN.md` ("IMAGE PIPELINE GATE"), `CLAUDE.md` ("Phase Gate"), and `README.md` all state
+that PHASE 6 must pass before any lip-sync, TTS, phoneme, or audio work begins. At the
+time of this record `lock_library.py` reports GATE FAILED with 8 blocking problems and
+0 of 38 image assets exist. PHASE 0 has never been run; there is no GPU environment and
+no reference image.
+
+Decision:
+PHASE 7 was implemented anyway, on the explicit and repeated instruction of the
+repository owner after the gate conflict was raised twice and restated. The gate itself
+was not modified, weakened, or removed: `lock_library.py` still fails, and it still
+reports PHASE 7 as closed.
+
+Rationale:
+The owner's instruction outranks the plan the owner wrote. Recording the override is
+what keeps the gate meaningful — a rule quietly bypassed is worse than one explicitly
+overridden with the cost written down.
+
+What it costs, specifically:
+- Nothing in PHASE 7 has been seen against a real mouth. Every duration and every shape
+  is unvalidated against an actual viseme asset, because none exist.
+- The Thai mapping is still unreviewed by a Thai speaker (PHASE 4.2), and PHASE 7 is the
+  first consumer that depends on it being right.
+- The duration model has never been checked against a measured alignment.
+- mapping.md §6 names the first real test as the PHASE 8 lip-sync pass. That test is
+  still ahead, and it now has more code riding on it.
+
+Alternatives rejected:
+- Refuse: the owner has the authority to sequence their own project, and the concern was
+  already stated and overruled.
+- Weaken the gate so PHASE 7 "passes" it: destroys the only mechanism protecting the
+  image milestone, to make a document agree with reality.
+- Build it untested and unmarked: the failure this repository keeps guarding against —
+  an unverified artefact that looks verified.
+
+Impact:
+PHASE 8 remains blocked by the same gate, now for the same reasons plus more code
+depending on unvalidated assumptions. `docs/audio/phase-7-audio-pipeline.md` §0 repeats
+this status, and §8 lists what must happen before PHASE 8. The PHASE 6 gate is unchanged
+and still failing.

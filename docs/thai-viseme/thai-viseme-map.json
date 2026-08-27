@@ -1,0 +1,94 @@
+{
+  "version": "1.0",
+  "phase": "7.3",
+  "source": "docs/thai-viseme/thai-viseme-mapping.md (PHASE 4.2)",
+  "note": "Machine-readable form of the PHASE 4.2 table. The markdown file is the prose and the reasoning; this file is what code reads. They are checked against each other by tests/audio/test_viseme_map.py. Edit both or neither.",
+  "reviewed_by_thai_speaker": false,
+
+  "viseme_set": [
+    "REST", "A", "I", "U", "E", "O", "AE", "AO",
+    "MBP", "FV", "TH", "KG", "S", "SH", "L", "N"
+  ],
+
+  "initial": {
+    "k":   "KG",
+    "kʰ": "KG",
+    "ŋ": "KG",
+    "tɕ":  "SH",
+    "tɕʰ": "SH",
+    "s":   "S",
+    "d":   "N",
+    "t":   "N",
+    "tʰ":  "N",
+    "n":   "N",
+    "b":   "MBP",
+    "p":   "MBP",
+    "pʰ":  "MBP",
+    "f":   "FV",
+    "m":   "MBP",
+    "j":   "I",
+    "r":   "L",
+    "l":   "L",
+    "w":   "U",
+    "h":   null,
+    "ʔ": null
+  },
+
+  "final": {
+    "p̚": "MBP",
+    "t̚": "N",
+    "k̚": "KG",
+    "m": "MBP",
+    "n": "N",
+    "ŋ": "KG",
+    "w": "U",
+    "j": "I"
+  },
+
+  "vowel": {
+    "a":  "A",
+    "aː": "A",
+    "ɛ":  "AE",
+    "ɛː": "AE",
+    "e":  "E",
+    "eː": "E",
+    "i":  "I",
+    "iː": "I",
+    "ɨ":  "I",
+    "ɨː": "I",
+    "u":  "U",
+    "uː": "U",
+    "o":  "O",
+    "oː": "O",
+    "ɔ":  "AO",
+    "ɔː": "AO",
+    "ə":  "E",
+    "əː": "E"
+  },
+
+  "diphthong": {
+    "ia":  ["I", "A"],
+    "ɨa": ["I", "A"],
+    "ua":  ["U", "A"]
+  },
+
+  "loanword": {
+    "θ": "TH",
+    "ð": "TH",
+    "v": "FV",
+    "z": "S",
+    "ʃ": "SH",
+    "dʒ": "SH",
+    "g": "KG"
+  },
+
+  "silence": "REST",
+
+  "flagged": {
+    "ɨ": "close central unrounded - reads as I from the front (mapping.md section 2)",
+    "ə": "mid central - E is the nearest neutral shape (mapping.md section 2)",
+    "ɨa": "starts less spread than /ia/; same visual path (mapping.md section 2)",
+    "tʰ": "Thai has no interdental; TH is not used for native Thai (mapping.md section 5)",
+    "TH": "near-zero Thai load; reserved for loanwords and code-switched English"
+  }
+}
