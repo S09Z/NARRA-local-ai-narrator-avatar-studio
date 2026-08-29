@@ -109,11 +109,26 @@ Standard PRESERVATION block:
 
 ```
 PRESERVATION:
-  Keep the same person: identical face shape, eye shape and position, eyebrows,
-  nose, hairstyle, hair color, skin tone, clothing, accessories, art style,
-  lighting, and camera framing as the reference image.
+  Keep the same person: identical <preserved features> as the reference image.
   Do not change anything except <TASK target>.
 ```
+
+`<preserved features>` is **built, not pasted**. Pasting a fixed list contradicts itself
+the moment the TASK targets one of the features it names — an expression edit would emit
+"identical eyebrows … do not change anything except the eyebrows". So each prompt declares
+which features its TASK touches, and those are removed from the list.
+
+Feature keys: `face`, `eyes`, `eyebrows`, `nose`, `mouth`, `hair`, `skin`, `clothing`,
+`accessories`, `style`, `lighting`, `camera`.
+
+| Asset class | Touches                 |
+|-------------|-------------------------|
+| expression  | `eyes, eyebrows, mouth` |
+| viseme      | `mouth`                 |
+| pose        | `camera`                |
+
+`scripts/generation/compile_prompt.py` generates the block, so the wording cannot drift
+between assets. See `prompts/README.md` §3 and `DECISIONS.md` → ADR-010.
 
 Preservation discipline:
 1. The TASK names exactly one target region.
@@ -235,6 +250,16 @@ NEGATIVE (render):     photorealistic drift, style change, added text, watermark
 ```
 
 Use only the group relevant to the asset class being generated.
+
+Individual terms are filtered the same way the preserved list is: a prompt that
+legitimately changes a feature does not also carry a negative forbidding it. A
+"change only the hair" prompt drops `different hairstyle` and `different hair color`,
+or it fights itself. Terms that guard a *property* rather than a *feature* are never
+dropped — `moved mouth position` still applies to a viseme, whose mouth shape changes
+but whose mouth position must not.
+
+`pose` omits the framing group entirely, because a pose selects its camera class by
+design. The compiler applies all of this; see `prompts/README.md` §3.
 
 ---
 
