@@ -197,3 +197,43 @@ def silhouette_bbox(path):
             "right": right / width,
             "bottom": bottom / height,
         }
+
+
+def changed_region(reference_path, asset_path, threshold=8):
+    """Bounding box of pixels that differ from the reference, normalized.
+
+    This is what makes "change only the mouth" checkable instead of a matter of
+    opinion: whatever moved between the reference and a derived asset shows up
+    here, and it either falls inside the permitted edit region or it does not.
+
+    Returns (bbox or None, changed_fraction), or None without Pillow.
+    threshold is per-channel and absorbs PNG re-encoding noise, not real edits.
+    """
+    Image = load_pillow()
+    if Image is None:
+        return None
+    from PIL import ImageChops
+
+    with Image.open(reference_path) as ref, Image.open(asset_path) as asset:
+        ref = ref.convert("RGBA")
+        asset = asset.convert("RGBA")
+        if ref.size != asset.size:
+            return None
+        width, height = ref.size
+        diff = ImageChops.difference(ref, asset)
+        combined = diff.split()[0]
+        for band in diff.split()[1:]:
+            combined = ImageChops.lighter(combined, band)
+        mask = combined.point(lambda value: 255 if value > threshold else 0)
+
+    bbox = mask.getbbox()
+    changed = mask.histogram()[255] / float(width * height)
+    if bbox is None:
+        return None, 0.0
+    left, top, right, bottom = bbox
+    return {
+        "left": left / width,
+        "top": top / height,
+        "right": right / width,
+        "bottom": bottom / height,
+    }, changed

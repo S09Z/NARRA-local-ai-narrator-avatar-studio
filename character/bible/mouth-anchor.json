@@ -16,6 +16,7 @@
     "mouth_width": null,
     "mouth_height": null
   },
+  "edit_region": null,
   "tolerances": {
     "anchor_drift_max_fraction_of_width": 0.005,
     "head_vertical_drift_max_fraction_of_height": 0.01
