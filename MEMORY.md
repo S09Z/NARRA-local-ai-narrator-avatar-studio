@@ -55,8 +55,7 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 Phase 0: not started — no ComfyUI, no models, no GPU environment yet.
 Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
 Phase 2: prompt system complete, blocked on the same inputs.
-Phase 3: prompts + QC tooling complete, no assets generated.
-Phase 4–6: planned.
+Phase 3–6: planned.
 Phase 7–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
@@ -89,18 +88,6 @@ Two inputs unblock the rest of Phase 1:
 The same two inputs unblock Phase 2. Nothing in Phase 2 has been validated against a
 real generation.
 
-### Phase 3 — Expression System
-
-| Step | Deliverable | Status |
-|------|-------------|--------|
-| 3.1 Canonical set | 12 names, in `scripts/lib/canon.py` | Complete |
-| 3.2 Dedicated prompts | `prompts/expressions/<name>-v1.0.md` × 12 | Complete |
-| 3.3 Generation | `docs/workflows/expression-generation.md` | Runbook written — **blocked, not run** |
-| 3.4 QC | `scripts/validation/validate_asset.py`, `scripts/utilities/contact_sheet.py` | Complete |
-| 3.5 Lock | `validate_asset.py --set expression` | Tooling complete — 0/12 assets exist |
-
-No expression asset has been generated. `character/expressions/` is empty.
-
 ## Decision Log
 
 Add dated decisions here.
@@ -128,21 +115,6 @@ Decision: Prompts declare `touches`; the compiler builds the preserved list and 
 negative terms from it (ADR-010).
 Reason: A self-contradicting prompt produces unstable output that gets blamed on the model.
 Impact: `PROMPT_GUIDE.md` §3 and §8 rewritten. Enforced by `compile_prompt.py --lint`.
-
-### 2026-08-25 — Expressions do not move the head
-Context: ASSET_SPEC §6 described `confused` with a head tilt and `proud` with a lifted chin.
-Decision: Expression assets hold head angle, chin, and (for 9 of 12) the mouth fixed (ADR-012).
-Reason: Moving the head moves the mouth anchor, so any viseme composited onto that asset
-lands in the wrong place and the asset fails the §9 tolerance.
-Impact: ASSET_SPEC §6 amended. `confused` is now carried by brow asymmetry alone.
-
-### 2026-08-25 — Shared helper modules
-Context: A second validator needed the image checks and canonical sets already written.
-Decision: `scripts/lib/canon.py` and `scripts/lib/imagecheck.py`, imported via an explicit
-sys.path insert; `validate_reference.py` and `compile_prompt.py` migrated onto them (ADR-011).
-Reason: Two copies of the canonical viseme set would let QC approve an asset the compiler
-could never have produced.
-Impact: No new dependency and no package manifest; ADR-007 still holds.
 
 ## Full Decision Records
 
