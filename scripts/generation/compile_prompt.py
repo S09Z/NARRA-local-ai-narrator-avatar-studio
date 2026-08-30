@@ -23,6 +23,10 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import canon                                                 # noqa: E402
+from canon import CAMERA_CLASSES, CANONICAL, SEED_BASE, SEED_SPAN   # noqa: E402
+
 REPO = Path(os.environ.get("NARRA_REPO", Path(__file__).resolve().parents[2]))
 PROMPTS = REPO / "prompts"
 MASTER_DIR = PROMPTS / "master"
@@ -36,27 +40,6 @@ BLOCK_ORDER = [
 BLOCKS = set(BLOCK_ORDER)
 
 KINDS = {"master", "expression", "viseme", "pose", "diagnostic"}
-
-# Canonical sets - ASSET_SPEC.md sections 6, 7, 8. Order defines the seed offset.
-EXPRESSIONS = [
-    "neutral", "friendly", "happy", "excited", "serious", "concerned",
-    "surprised", "confused", "thinking", "explaining", "proud", "embarrassed",
-]
-VISEMES = [
-    "REST", "A", "I", "U", "E", "O", "AE", "AO",
-    "MBP", "FV", "TH", "KG", "S", "SH", "L", "N",
-]
-POSES = [
-    "neutral", "explaining", "pointing-left", "pointing-right", "presenting",
-    "surprised", "thinking", "concerned", "confident", "excited",
-]
-CAMERA_CLASSES = {"close-up", "medium", "upper-body", "three-quarter"}
-
-CANONICAL = {"expression": EXPRESSIONS, "viseme": VISEMES, "pose": POSES}
-
-# PLAN.md section 2.4, DECISIONS.md ADR-009
-SEED_BASE = {"diagnostic": 1000, "expression": 10000, "viseme": 20000, "pose": 30000}
-SEED_SPAN = 1000
 
 # PROMPT_GUIDE.md section 3. The preserved features are listed explicitly rather
 # than pasted as fixed text, because the fixed text contradicts itself the moment
@@ -82,7 +65,10 @@ PRESERVE_ORDER = list(PRESERVABLE)
 # What each asset class is allowed to touch (character-bible.md section 14).
 # Diagnostics declare their own, since proving containment is their whole purpose.
 DEFAULT_TOUCHES = {
-    "expression": ["eyes", "eyebrows", "mouth"],
+    # ASSET_SPEC.md section 6 requires a REST mouth on 9 of the 12 expressions so the
+    # viseme layer can composite over them, so the default does not touch the mouth.
+    # The three open-mouth expressions declare "touches: eyes, eyebrows, mouth".
+    "expression": ["eyes", "eyebrows"],
     "viseme": ["mouth"],
     "pose": ["camera"],
 }
@@ -226,22 +212,8 @@ def parse(path):
     return PromptFile(path, header, blocks)
 
 
-def canonical_index(kind, asset_name):
-    """Position of asset_name in its canonical set, or None if it is not a member."""
-    entries = CANONICAL.get(kind)
-    if entries is None:
-        return None
-    lowered = [entry.lower() for entry in entries]
-    try:
-        return lowered.index(asset_name.lower())
-    except ValueError:
-        return None
-
-
-def canonical_name(kind, asset_name):
-    """The canonically cased name - visemes are uppercase in metadata (ASSET_SPEC 5)."""
-    index = canonical_index(kind, asset_name)
-    return CANONICAL[kind][index] if index is not None else asset_name
+canonical_index = canon.index_of
+canonical_name = canon.canonical_name
 
 
 def derive_seed(prompt):
@@ -262,12 +234,10 @@ def derive_seed(prompt):
                 f"{base}-{base + SEED_SPAN - 1} (DECISIONS.md ADR-009)")
         return seed
 
-    index = canonical_index(kind, prompt.header.get("asset_name", ""))
-    if index is None:
-        raise PromptError(
-            f"{prompt.label}: asset_name {prompt.header.get('asset_name')!r} is not in the "
-            f"canonical {kind} set - {', '.join(CANONICAL[kind])}")
-    return SEED_BASE[kind] + index
+    try:
+        return canon.derive_seed(kind, prompt.header.get("asset_name", ""))
+    except canon.CanonError as exc:
+        raise PromptError(f"{prompt.label}: asset_name {exc}")
 
 
 def find_master():

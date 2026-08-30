@@ -158,25 +158,50 @@ class CompilePromptTest(unittest.TestCase):
         self.assertIn("eye shape and position", preservation)
         self.assertIn("Do not change anything except the mouth and jaw.", preservation)
 
-    def test_expression_preservation_omits_eyes_and_eyebrows(self):
+    def test_expression_default_preserves_the_mouth(self):
+        # ASSET_SPEC 6: expression assets carry a REST mouth so visemes composite.
         self.write("expressions/happy-v1.0.md", """\
             ---
             id: happy
             version: 1.0
             kind: expression
             asset_name: happy
-            task_target: the eyes, eyebrows, and mouth corners
+            task_target: the eyes and eyebrows
             ---
 
             ## TASK
 
-            Change only the eyes, eyebrows, and mouth corners.
+            Change only the eyes and eyebrows.
 
             ## EXPRESSION
 
-            Cheeks raised, eyes narrowed, mouth corners lifted. Intensity: moderate.
+            Cheeks raised, eyes narrowed. Intensity: moderate.
             """)
         compiled = self.compile_json("expressions/happy-v1.0.md")["compiled"]
+        kept = [line for line in compiled.splitlines() if "Keep the same person" in line][0]
+        self.assertIn("mouth shape and position", kept)
+        self.assertNotIn("eye shape and position", kept)
+
+    def test_expression_preservation_omits_eyes_and_eyebrows(self):
+        self.write("expressions/excited-v1.0.md", """\
+            ---
+            id: excited
+            version: 1.0
+            kind: expression
+            asset_name: excited
+            task_target: the eyes, eyebrows, and mouth
+            touches: eyes, eyebrows, mouth
+            ---
+
+            ## TASK
+
+            Change only the eyes, eyebrows, and mouth.
+
+            ## EXPRESSION
+
+            Eyes wide, brows raised, mouth open. Intensity: strong.
+            """)
+        compiled = self.compile_json("expressions/excited-v1.0.md")["compiled"]
         preservation = [c for c in compiled.split("\n\n") if c.startswith("PRESERVATION")][0]
         # Assert on the preserved list only - the trailing "except ..." line names
         # the touched features by design.
