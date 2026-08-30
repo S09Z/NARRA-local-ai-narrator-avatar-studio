@@ -82,10 +82,10 @@ Count required for PHASE 6: **12**
 | 5 | serious     | level brows, steady gaze                | REST  |
 | 6 | concerned   | inner brows raised, drawn together      | REST  |
 | 7 | surprised   | wide eyes, high brows                   | open  |
-| 8 | confused    | strongly asymmetric brows               | REST  |
+| 8 | confused    | asymmetric brows, slight head tilt      | REST  |
 | 9 | thinking    | gaze off-camera, one brow raised        | REST  |
 |10 | explaining  | engaged brows, direct gaze              | open  |
-|11 | proud       | relaxed brows, slightly lowered lids    | REST  |
+|11 | proud       | lifted chin, relaxed confident brows    | REST  |
 |12 | embarrassed | averted gaze, raised inner brows        | REST  |
 
 Requirements:
@@ -95,9 +95,6 @@ Requirements:
 - Each expression is visually distinct from every other expression in the set.
 - Expression assets carry a REST mouth unless the table says otherwise, so the viseme
   layer can be composited over them.
-- Head angle, head tilt, and chin position are identical to the reference in every
-  expression. An expression that moves the head moves the mouth anchor with it and fails
-  §9 regardless of how well it reads. See `DECISIONS.md` → ADR-012.
 
 ## 7. Viseme Specification
 

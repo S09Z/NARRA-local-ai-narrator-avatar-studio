@@ -121,11 +121,11 @@ which features its TASK touches, and those are removed from the list.
 Feature keys: `face`, `eyes`, `eyebrows`, `nose`, `mouth`, `hair`, `skin`, `clothing`,
 `accessories`, `style`, `lighting`, `camera`.
 
-| Asset class | Touches          | Note                                              |
-|-------------|------------------|---------------------------------------------------|
-| expression  | `eyes, eyebrows` | 9 of 12 keep a REST mouth; the open-mouth three declare `mouth` too |
-| viseme      | `mouth`          |                                                   |
-| pose        | `camera`         |                                                   |
+| Asset class | Touches                 |
+|-------------|-------------------------|
+| expression  | `eyes, eyebrows, mouth` |
+| viseme      | `mouth`                 |
+| pose        | `camera`                |
 
 `scripts/generation/compile_prompt.py` generates the block, so the wording cannot drift
 between assets. See `prompts/README.md` §3 and `DECISIONS.md` → ADR-010.
