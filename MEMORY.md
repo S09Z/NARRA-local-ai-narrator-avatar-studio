@@ -53,9 +53,8 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 ## Current Status
 
 Phase 0: not started — no ComfyUI, no models, no GPU environment yet.
-Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
-Phase 2: prompt system complete, blocked on the same inputs.
-Phase 3–6: planned.
+Phase 1: scaffolding complete, blocked on inputs.
+Phase 2–6: planned.
 Phase 7–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
@@ -74,19 +73,6 @@ Two inputs unblock the rest of Phase 1:
    `python3 scripts/validation/validate_reference.py <file> --import`.
 2. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
    cannot run without ComfyUI and the Klein 4B models.
-
-### Phase 2 — Prompt & Character Consistency
-
-| Step | Deliverable | Status |
-|------|-------------|--------|
-| 2.1 Master prompt    | `prompts/master/master-character-v1.0.md` | Structure complete — slots filled from the bible |
-| 2.2 Prompt variables | `prompts/README.md`, `scripts/generation/compile_prompt.py` | Complete |
-| 2.3 Versioning       | filename + header versioning, enforced by `--lint` | Complete |
-| 2.4 Deterministic seeds | seed = range base + canonical index | Complete |
-| 2.5 Reference-edit tests | `tests/assets/phase2-reference-edit.md`, `prompts/diagnostic/` | Prompts written — **blocked on the PHASE 0 and PHASE 1 gates** |
-
-The same two inputs unblock Phase 2. Nothing in Phase 2 has been validated against a
-real generation.
 
 ## Decision Log
 
@@ -107,14 +93,6 @@ alias (ADR-008). Diagnostic and gate-test generations use seeds 1000–1999 (ADR
 Reason: Version history on the reference without rewriting workflow JSON on every bump;
 diagnostic runs must not share seed space with library assets.
 Impact: Enforced by `scripts/validation/validate_reference.py --check-imported`.
-
-### 2026-08-25 — Preservation and negatives are generated
-Context: The fixed PRESERVATION template and negative groups contradict themselves when
-the TASK targets a feature they name.
-Decision: Prompts declare `touches`; the compiler builds the preserved list and filters
-negative terms from it (ADR-010).
-Reason: A self-contradicting prompt produces unstable output that gets blamed on the model.
-Impact: `PROMPT_GUIDE.md` §3 and §8 rewritten. Enforced by `compile_prompt.py --lint`.
 
 ## Full Decision Records
 
