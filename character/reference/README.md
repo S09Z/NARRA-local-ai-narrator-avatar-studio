@@ -63,8 +63,13 @@ Two properties matter more than aesthetics, because every later phase inherits t
 # 2. Validate it against the spec (does not write anything)
 python3 scripts/validation/validate_reference.py assets/input/candidate.png
 
+# 2a. If it fails only on resolution or on near-opaque alpha, correct it mechanically.
+#     prep refuses a genuine soft matte, a missing cutout, or a non-square candidate
+#     rather than papering over them, and never overwrites the original.
+python3 scripts/utilities/prep_reference.py assets/input/candidate.png
+
 # 3. If it passes, import it — writes the versioned master, master.png, and the sidecar
-python3 scripts/validation/validate_reference.py assets/input/candidate.png --import
+python3 scripts/validation/validate_reference.py assets/input/candidate-prepped.png --import
 
 # 4. Verify the imported state
 python3 scripts/validation/validate_reference.py --check-imported

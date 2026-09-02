@@ -73,6 +73,10 @@ Reference docs, consulted as needed:
 ├── ASSET_SPEC.md          Asset technical specification
 ├── TROUBLESHOOTING.md     Diagnostics
 ├── README.md
+├── Makefile              Dev tasks: install, test, lint, check, gate, status, clean
+├── pyproject.toml         Dependencies — environment only, package-mode = false
+├── poetry.lock            Pinned versions
+├── poetry.toml            Keeps the virtualenv at .venv/ in-project
 ├── .gitignore
 │
 ├── character/             Canonical, approved character assets
@@ -116,6 +120,7 @@ Reference docs, consulted as needed:
 │
 ├── scripts/               Standalone utilities (no app framework)
 │   ├── setup/  generation/  validation/  utilities/
+│   │             prep_reference.py — correct a candidate to ASSET_SPEC
 │   ├── audio/               PHASE 7 — TTS and timeline CLIs
 │   ├── animation/           PHASE 8 — frame plan and render CLIs
 │   └── lib/                 shared modules (canon, imagecheck, g2p, timeline, animation)
@@ -140,6 +145,37 @@ Per-change loop (from `CLAUDE.md`):
 ```
 inspect → understand → propose → implement → test → report
 ```
+
+### Dev tasks
+
+Setup, once:
+
+```bash
+make install     # poetry install — creates .venv/ and installs Pillow + pytest
+make check       # test + lint, on that .venv
+```
+
+`make` is the entry point for the checks this repository already has. Every target is a
+script that is equally runnable by hand. The interpreter is `.venv/bin/python` when one
+exists and a bare `python3` otherwise — Poetry is how you get an environment, not a
+requirement to run anything (`DECISIONS.md` ADR-029). Override with
+`make test PYTHON=/usr/bin/python3.12`.
+
+| Task | What it runs |
+|---------------|--------------------------------------------------------------|
+| `make help` | the target list (default) |
+| `make install` | `poetry install` — dependencies into `.venv/` |
+| `make test` | `pytest tests/` |
+| `make lint` | `compile_prompt.py --lint` — prompt structure, preservation, seeds |
+| `make check` | `test` + `lint`, the pre-commit pair |
+| `make gate` | `lock_library.py` — the PHASE 6 gate, reports only |
+| `make status` | `status.py` — git, prompts, library, gate verdict, next step |
+| `make clean` | Python caches only; never assets, models, or metadata |
+
+The dependency surface is two packages — Pillow and pytest — declared in `pyproject.toml`
+and pinned in `poetry.lock`. `package-mode = false`: Poetry manages the environment and
+does not package NARRA, so there is no `narra` package, module, or command to import
+(ADR-007, ADR-029). Adding a third dependency is a decision — see `CLAUDE.md`.
 
 Per-milestone loop:
 
