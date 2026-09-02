@@ -1,0 +1,52 @@
+{
+  "$comment": "PHASE 5.3 narrator compositions. A state is a recipe over the asset layers (DECISIONS.md ADR-004), not an asset. Validated by scripts/validation/validate_compositions.py.",
+  "character": "narra",
+  "version": 1,
+  "states": {
+    "talking": {
+      "description": "Default speaking state. Neutral stance, mouth driven by the viseme track.",
+      "pose": "neutral",
+      "camera_class": "medium",
+      "expression": "neutral",
+      "mouth": "viseme-track",
+      "idle_viseme": "REST",
+      "notes": "The state a narration returns to between beats."
+    },
+    "explaining": {
+      "description": "Engaged speaking state. Body leans in, warm expression, mouth driven by the viseme track.",
+      "pose": "explaining",
+      "camera_class": "medium",
+      "expression": "friendly",
+      "mouth": "viseme-track",
+      "idle_viseme": "REST",
+      "notes": "Uses the friendly expression, not the explaining expression - the latter has an open mouth and cannot host a viseme track."
+    },
+    "presenting": {
+      "description": "Offering or introducing. Open palms, positive expression, mouth driven by the viseme track.",
+      "pose": "presenting",
+      "camera_class": "upper-body",
+      "expression": "happy",
+      "mouth": "viseme-track",
+      "idle_viseme": "REST",
+      "notes": "Hands are fully in frame; upper-body framing is required, not optional."
+    },
+    "reaction": {
+      "description": "Non-speaking beat. A startled recoil held for emphasis.",
+      "pose": "surprised",
+      "camera_class": "medium",
+      "expression": "surprised",
+      "mouth": "static",
+      "idle_viseme": null,
+      "notes": "The surprised expression carries its own open mouth, so no viseme track is applied. Silence by design."
+    },
+    "emphasis": {
+      "description": "Non-speaking beat. An energetic punctuation between sentences.",
+      "pose": "excited",
+      "camera_class": "upper-body",
+      "expression": "excited",
+      "mouth": "static",
+      "idle_viseme": null,
+      "notes": "The excited expression carries its own open mouth. Hold briefly; it reads as caricature if sustained."
+    }
+  }
+}

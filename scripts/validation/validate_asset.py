@@ -88,6 +88,15 @@ def dig(data, dotted):
     return node
 
 
+def pose_camera_class(pose):
+    """The camera class the pose prompt declares, or None if there is no prompt."""
+    for path in sorted((REPO / "prompts" / "poses").glob(f"{pose}-v*.md")):
+        for line in path.read_text().splitlines():
+            if line.startswith("camera_class:"):
+                return line.split(":", 1)[1].strip()
+    return None
+
+
 def reference_path():
     versioned = REPO / "character" / "reference" / f"{canon.CHARACTER}-reference-master-v1.png"
     return versioned if versioned.exists() else None
@@ -163,6 +172,25 @@ def check_sidecar(path, fields, report):
             report.add(FAIL, "metadata/filename-agreement", "; ".join(mismatched))
         else:
             report.add(PASS, "metadata/filename-agreement", "metadata matches the filename")
+
+        if fields["asset_type"] == "pose":
+            # ASSET_SPEC 8: pose name AND camera class are both recorded.
+            recorded_class = data.get("camera_class")
+            declared = pose_camera_class(fields["name"])
+            if not recorded_class:
+                report.add(FAIL, "metadata/camera-class",
+                           "pose metadata must record camera_class (ASSET_SPEC 8)")
+            elif recorded_class not in canon.CAMERA_CLASSES:
+                report.add(FAIL, "metadata/camera-class",
+                           f"{recorded_class!r} is not one of "
+                           f"{', '.join(sorted(canon.CAMERA_CLASSES))}")
+            elif declared and declared != recorded_class:
+                report.add(FAIL, "metadata/camera-class",
+                           f"{recorded_class!r} but the {fields['name']!r} pose prompt "
+                           f"declares {declared!r} - the asset was framed differently "
+                           "from the prompt it records")
+            else:
+                report.add(PASS, "metadata/camera-class", recorded_class)
 
         seed = dig(data, "generation.seed")
         try:
@@ -411,7 +439,13 @@ def validate_set(asset_type):
     missing = [name for name in expected if name not in found]
     for name in expected:
         marker = "OK     " if name in found else "MISSING"
-        print(f"  [{marker}] {name}")
+        suffix = ""
+        if asset_type == "pose":
+            # ASSET_SPEC 8: head size is consistent within a camera class, so the
+            # class each asset belongs to has to be visible when reviewing the set.
+            declared = pose_camera_class(name)
+            suffix = f"  [{declared or 'no prompt'}]"
+        print(f"  [{marker}] {name}{suffix}")
     for name in strays:
         print(f"  [STRAY  ] {name}")
 

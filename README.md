@@ -74,6 +74,7 @@ Reference docs, consulted as needed:
 ├── character/             Canonical, approved character assets
 │   ├── reference/           master reference image (source of truth)
 │   ├── bible/               character bible, visual spec, mouth anchor
+│   ├── compositions/        narrator states — recipes over the asset layers
 │   ├── expressions/         12 approved expressions
 │   ├── visemes/             16 approved Thai visemes
 │   └── poses/               10 approved narrator poses

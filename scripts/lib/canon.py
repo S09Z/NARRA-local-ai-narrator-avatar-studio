@@ -27,6 +27,15 @@ POSES = [
 ]
 CAMERA_CLASSES = {"close-up", "medium", "upper-body", "three-quarter"}
 
+# ASSET_SPEC.md section 6: the only expressions defined by an open mouth. The other
+# nine carry a REST mouth so the viseme layer can composite over them (ADR-004).
+# An open-mouth expression cannot host a viseme track - the mouth is already spent.
+OPEN_MOUTH_EXPRESSIONS = {"excited", "surprised", "explaining"}
+
+# PLAN.md section 5.3
+NARRATOR_STATES = ["talking", "explaining", "presenting", "reaction", "emphasis"]
+MOUTH_MODES = {"viseme-track", "static"}
+
 CANONICAL = {"expression": EXPRESSIONS, "viseme": VISEMES, "pose": POSES}
 
 # PLAN.md section 2.4, DECISIONS.md ADR-009

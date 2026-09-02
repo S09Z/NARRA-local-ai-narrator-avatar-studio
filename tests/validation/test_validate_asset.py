@@ -250,6 +250,65 @@ class ValidateAssetTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("will not composite", result.stdout)
 
+    # --- poses (PHASE 5 / ASSET_SPEC 8) ----------------------------------
+
+    def make_pose(self, name="pointing-left", seed=30002, camera_class="upper-body",
+                  with_prompt=True):
+        if with_prompt:
+            poses = self.repo / "prompts" / "poses"
+            poses.mkdir(parents=True, exist_ok=True)
+            (poses / f"{name}-v1.0.md").write_text(
+                f"---\nid: {name}\nversion: 1.0\nkind: pose\nasset_name: {name}\n"
+                "camera_class: upper-body\ntask_target: the body\n---\n\n"
+                "## TASK\n\nChange only the body.\n")
+        path = self.repo / "character" / "poses" / f"narra-pose-{name}-v1.png"
+        draw_character(path)
+        self.sidecar_for(path, "pose", name, seed, camera_class=camera_class)
+        return path
+
+    def test_pose_with_a_matching_camera_class_passes(self):
+        path = self.make_pose()
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("[PASS] metadata/camera-class", result.stdout)
+
+    def test_pose_without_a_camera_class_fails(self):
+        path = self.make_pose()
+        data = json.loads(path.with_suffix(".json").read_text())
+        del data["camera_class"]
+        path.with_suffix(".json").write_text(json.dumps(data))
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("must record camera_class", result.stdout)
+
+    def test_pose_with_an_unknown_camera_class_fails(self):
+        path = self.make_pose(camera_class="extreme-close-up")
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("metadata/camera-class", result.stdout)
+
+    def test_pose_disagreeing_with_its_prompt_fails(self):
+        path = self.make_pose(camera_class="medium")
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("framed differently", result.stdout)
+
+    def test_pose_without_a_prompt_to_check_against_still_passes(self):
+        path = self.make_pose(with_prompt=False)
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_expression_does_not_require_a_camera_class(self):
+        path = self.make_asset()
+        result = self.run_cli(path)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertNotIn("metadata/camera-class", result.stdout)
+
+    def test_pose_set_listing_shows_camera_classes(self):
+        self.make_pose()
+        result = self.run_cli("--set", "pose")
+        self.assertIn("[upper-body]", result.stdout)
+
     # --- containment (PHASE 4.5) -----------------------------------------
 
     def measured_anchor_with_region(self):

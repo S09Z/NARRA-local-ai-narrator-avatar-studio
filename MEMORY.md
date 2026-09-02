@@ -57,7 +57,8 @@ Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
 Phase 2: prompt system complete, blocked on the same inputs.
 Phase 3: prompts + QC tooling complete, no assets generated.
 Phase 4: prompts + mapping + QC tooling complete, no assets generated.
-Phase 5–6: planned.
+Phase 5: prompts + camera classes + compositions complete, no assets generated.
+Phase 6: planned.
 Phase 7–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
@@ -117,6 +118,18 @@ No viseme asset has been generated. `character/visemes/` is empty.
 The Thai mapping needs review by a Thai speaker before PHASE 8 relies on it; `TH` has no
 native Thai phoneme and is expected to be idle in most sentences.
 
+### Phase 5 — Pose & Narrator Asset Library
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 5.1 Pose set | `prompts/poses/<name>-v1.0.md` × 10 | Complete |
+| 5.2 Camera set | `visual-spec.md` §2, `docs/workflows/pose-generation.md` | Complete — head heights are **ratios**; absolutes need the reference |
+| 5.3 Compositions | `character/compositions/narrator-states.json` + validator | Complete |
+
+No pose asset has been generated. `character/poses/` is empty.
+PLAN §5 defines no QC or lock milestone; those requirements come from ASSET_SPEC §8 and
+§10, and are covered by `validate_asset.py --set pose`.
+
 ## Decision Log
 
 Add dated decisions here.
@@ -167,6 +180,15 @@ reference and fail it if any changed pixel escapes that box (ADR-013).
 Reason: The changed-pixel bounding box is direct evidence of what an edit touched; prompt
 wording and denoise strength are only proxies for it.
 Impact: Inert until the anchor is measured (PHASE 4.3, needs the reference image).
+
+### 2026-08-25 — Camera classes are ratios, compositions are data
+Context: PHASE 5 needed camera classes defined before the reference exists, and five
+reusable narrator states.
+Decision: Classes are specified as a ratio to the close-up head height (ADR-014). States
+live in `character/compositions/narrator-states.json` and are validated (ADR-015).
+Reason: The ratio is the decision, the absolute is a measurement. And an open-mouth
+expression cannot host a viseme track — it would render two mouths.
+Impact: The `explaining` state uses the `friendly` expression, not the `explaining` one.
 
 ## Full Decision Records
 
