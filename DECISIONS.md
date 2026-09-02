@@ -1201,3 +1201,64 @@ The candidate now passes all nine automated checks with no threshold changed.
 in `imagecheck.check_pixels` should become tolerance-based is a separate question about
 what ASSET_SPEC §4 means, deliberately not settled here.
 
+---
+
+## ADR-031 — The ordered procedure is a document; the first run is a command
+
+Date: 2026-09-02
+Status: accepted
+
+Context:
+The repository answers "what are the phases" (`PLAN.md`), "what must an asset satisfy"
+(`ASSET_SPEC.md`), and "why is it built this way" (`DECISIONS.md`), but the question a
+person actually arrives with — *what do I run next, and where does it stop* — had no
+home. Answering it meant assembling eight commands out of four documents and then
+knowing which failures are work waiting for a person and which are the RTX 5070 this
+laptop is not. `make status` reports where the project stands; it does not say what to
+do about it, and deliberately should not.
+
+Decision:
+Two artefacts, not one. `GUIDELINE.md` is the ordered procedure — fourteen steps, each
+naming the machine it runs on, the commands, the pass criterion, and what it blocks.
+`scripts/utilities/demo_run.py`, behind `make demo`, walks the checkable subset of those
+steps, prints the real command before running it, and reports `OK` / `TODO` / `BLOCKED`.
+
+Rationale:
+A document alone goes stale silently. A command alone cannot explain why the order is
+the order — why the bible precedes generation, why the anchor is measured once, why
+replacing the reference is a full library regeneration. Splitting them lets each do what
+it is good at, and the demo printing its commands verbatim is what keeps the two honest:
+a reader can run any line of the tour by hand and get the same answer.
+
+Three constraints are deliberate:
+
+The walkthrough **writes nothing**. It generates no image, records no metadata, installs
+no dependency. A first-run command that quietly creates files is one nobody can point at
+a live library, which would make it useless exactly when it is most wanted. A test pins
+this by hashing the tree before and after.
+
+It **always exits 0**, for the reason ADR-028 gives for `status`. The gate is
+`lock_library.py`; a tour that can fail a build is a check wearing the wrong name.
+
+It **reports `BLOCKED` rather than simulating**. The generation steps need ComfyUI and
+the GPU. Faking them with placeholder assets would put fabricated images one careless
+copy away from `character/`, and would teach the pipeline's shape while hiding the only
+fact that currently matters — that 0 of 38 assets exist.
+
+Alternatives rejected:
+- Folding the procedure into `README.md`: the README orients a reader; a fourteen-step
+  runbook buried in it serves neither purpose.
+- Extending `status.py` with a `--walkthrough` mode: status collects facts and prints
+  them. Running eight subprocesses and teaching an order is a different job, and ADR-028
+  already argues against giving a reporting tool a second personality.
+- A `--demo` flag that generates placeholder assets so the whole pipeline "runs":
+  rejected on ADR-003 grounds. Nothing that is not a real reference edit should ever
+  exist in a shape that could be mistaken for a library asset.
+
+Impact:
+`make demo` is the first command in a fresh checkout, and `GUIDELINE.md` is what
+`README.md` points at for the procedure. On this tree the tour reports OK 3 / TODO 3 /
+BLOCKED 2, and names filling the character bible as the next action — the same answer
+`make status` gives, arrived at by walking the steps rather than by knowing where to
+look. When a step's command changes, the demo breaks loudly and the guideline must be
+edited with it; that coupling is the point.

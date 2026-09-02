@@ -16,7 +16,7 @@ SCRIPTS := $(REPO)/scripts
 TESTS   := $(REPO)/tests
 
 .DEFAULT_GOAL := help
-.PHONY: help install test lint gate check status clean
+.PHONY: help install test lint gate check status demo clean
 
 help:  ## show this list
 	@echo
@@ -44,6 +44,9 @@ check: test lint  ## test + lint, the pre-commit pair
 
 status:  ## where the project is: git, prompts, library, PHASE 6 gate
 	@$(PYTHON) $(SCRIPTS)/utilities/status.py
+
+demo:  ## guided first run: walk every step in order, generating nothing
+	@$(PYTHON) $(SCRIPTS)/utilities/demo_run.py $(ARGS)
 
 # Python build artefacts only. Generated images, timelines, frames, and model
 # weights are left alone — they are expensive, gitignored, and not this target's

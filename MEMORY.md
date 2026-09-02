@@ -88,6 +88,8 @@ What remains in Phase 1:
 3. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
    cannot run without ComfyUI and the Klein 4B models.
 
+`GUIDELINE.md` is the ordered procedure; `make demo` reports which of these are done.
+
 ### Phase 2 — Prompt & Character Consistency
 
 | Step | Deliverable | Status |
@@ -372,3 +374,16 @@ Impact: prep refuses a genuine soft matte (>6% at alpha 6-249), a missing alpha 
 and a non-square candidate (`--pad` letterboxes). Whether ASSET_SPEC §4 should test
 opacity with a tolerance instead of `== 255` is still open.
 
+### 2026-09-02 — The procedure is a document, the first run is a command
+Context: "what do I run next, and where does it stop" had no home — it meant assembling
+eight commands out of four documents, and `make status` reports the project's state
+without saying what to do about it.
+Decision: `GUIDELINE.md` (fourteen ordered steps, each with its machine, commands, pass
+criterion, and what it blocks) plus `scripts/utilities/demo_run.py` behind `make demo`
+(ADR-031).
+Reason: a document alone goes stale; a command alone cannot explain why the order is the
+order. The demo prints every command verbatim before running it, so the two cannot drift
+apart unnoticed.
+Impact: `make demo` writes nothing, always exits 0, and reports BLOCKED rather than
+simulating generation — no placeholder asset is ever created. It currently reports
+OK 3 / TODO 3 / BLOCKED 2, next action: fill the character bible.
