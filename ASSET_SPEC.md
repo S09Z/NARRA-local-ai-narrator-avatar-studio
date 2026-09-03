@@ -18,6 +18,19 @@ An asset that does not meet this spec does not enter `character/` or `assets/app
 4K generation is not used during iteration. Upscaling is a post-approval step and never
 a substitute for a correct 1024 generation.
 
+An upscale is a **derivative**, not a library asset (`DECISIONS.md` → ADR-017):
+
+| Property | Rule |
+|----------|------|
+| Location | `assets/approved/upscaled/` — never `character/` |
+| Filename | `<approved-master-stem>-up2048.png` |
+| Sidecar  | `derived_from`, `derived_from_sha256`, `resolution`, `upscaler` |
+| Source   | an asset in the production lock, at the sha256 recorded in it |
+| Reuse    | never the input to a further edit — edits start from the 1024 master |
+
+`scripts/validation/lock_library.py` fails the PHASE 6 gate on any upscale that cannot
+name the exact locked master it came from.
+
 ## 2. Aspect Ratio
 
 - Character assets: **1:1 square**.

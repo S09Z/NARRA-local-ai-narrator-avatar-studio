@@ -55,6 +55,8 @@ Reference docs, consulted as needed:
 | `ASSET_SPEC.md`      | Resolution, naming, mouth anchor, QC, metadata schema |
 | `DECISIONS.md`       | Why the architecture is the way it is                 |
 | `TROUBLESHOOTING.md` | ComfyUI, VRAM, model, node, and consistency failures  |
+| `docs/workflows/`    | Per-phase runbooks, including the PHASE 6 lock        |
+| `docs/production-baseline.md` | What the locked library was produced with (generated) |
 
 ## Directory Structure
 
@@ -99,12 +101,14 @@ Reference docs, consulted as needed:
 │   ├── input/               source material
 │   ├── generated/           raw output — not committed
 │   ├── approved/            passed QC
+│   │   └── upscaled/          2048 derivatives of locked masters
 │   └── contact-sheets/      side-by-side review sheets
 │
 ├── metadata/              Reproducibility records
 │   ├── generations/         per-asset generation metadata
 │   ├── prompts/             compiled prompt records
-│   └── validation/          QC results
+│   ├── validation/          QC results and human sign-offs
+│   └── production-lock.json  PHASE 6 lock — written by lock_library.py
 │
 ├── scripts/               Standalone utilities (no app framework)
 │   ├── setup/  generation/  validation/  utilities/

@@ -38,6 +38,10 @@ MOUTH_MODES = {"viseme-track", "static"}
 
 CANONICAL = {"expression": EXPRESSIONS, "viseme": VISEMES, "pose": POSES}
 
+# PLAN.md section 6.1: the counts the PHASE 6 gate requires. Held separately from
+# the lists above so that quietly dropping a viseme cannot quietly move the gate.
+REQUIRED_COUNTS = {"expression": 12, "viseme": 16, "pose": 10}
+
 # PLAN.md section 2.4, DECISIONS.md ADR-009
 SEED_BASE = {"diagnostic": 1000, "expression": 10000, "viseme": 20000, "pose": 30000}
 SEED_SPAN = 1000
