@@ -144,8 +144,11 @@ class StatusTest(unittest.TestCase):
         (self.repo / "metadata" / "timelines" / "a.json").write_text("{}")
         (self.repo / "metadata" / "animations" / "a.json").write_text("{}")
         (self.repo / "assets" / "frames" / "clip-a").mkdir()
+        (self.repo / "metadata" / "videos").mkdir(parents=True, exist_ok=True)
+        (self.repo / "metadata" / "videos" / "a.json").write_text("{}")
         self.assertEqual(self.state("--no-gate")["artefacts"],
-                         {"timelines": 1, "animations": 1, "frame_sets": 1})
+                         {"timelines": 1, "animations": 1, "frame_sets": 1,
+                          "video_plans": 1})
 
     def test_reports_the_production_lock_when_written(self):
         self.assertFalse(self.state("--no-gate")["lock"]["written"])

@@ -144,5 +144,84 @@ class ReportingTest(unittest.TestCase):
             thai_g2p.phonemize("นารา", engine="nope")
 
 
+class SpanTest(unittest.TestCase):
+    """Where a syllable came from - added for PHASE 9 subtitles (ADR-033).
+
+    Phonemization does not need positions; a subtitle line break does, and it needs
+    them to survive normalisation, which strips exactly the characters a reader most
+    needs to see.
+    """
+
+    def test_every_syllable_carries_a_span(self):
+        result = thai_g2p.phonemize("สวัสดีครับ วันนี้ดีมาก")
+        for syllable in result.syllables:
+            with self.subTest(syllable=syllable.text):
+                self.assertIsNotNone(syllable.span)
+                start, end = syllable.span
+                self.assertLess(start, end)
+
+    def test_spans_do_not_move_backwards(self):
+        result = thai_g2p.phonemize("วันนี้เราจะมาเรียนรู้เรื่องการทำอาหารไทย")
+        for before, after in zip(result.syllables, result.syllables[1:]):
+            self.assertLessEqual(before.span[0], after.span[0])
+
+    def test_a_span_selects_its_own_text_in_the_normalised_source(self):
+        text = "สวัสดีครับ วันนี้ดีมาก"
+        normalised, _, _ = thai_g2p.normalise_map(text)
+        for syllable in thai_g2p.phonemize(text).syllables:
+            with self.subTest(syllable=syllable.text):
+                start, end = syllable.span
+                self.assertEqual(normalised[start:end], syllable.text)
+
+    def test_adjacent_identical_words_get_distinct_spans(self):
+        """The reason a span exists at all: `text` alone cannot separate มา from มา."""
+        spans = {syllable.span for syllable in thai_g2p.phonemize("มามา").syllables}
+        self.assertEqual(len(spans), 2)
+
+
+class NormaliseMapTest(unittest.TestCase):
+
+    CASES = ["สวัสดีครับ", "วันนี้", "ต่างๆ นานา", "สตางค์", "ที่นี่", "นารา", "abc ๆ"]
+
+    def test_it_agrees_with_normalise(self):
+        for text in self.CASES:
+            with self.subTest(text=text):
+                self.assertEqual(thai_g2p.normalise_map(text)[0],
+                                 thai_g2p.normalise(text))
+
+    def test_every_character_maps_into_the_base(self):
+        for text in self.CASES:
+            with self.subTest(text=text):
+                normalised, source, base = thai_g2p.normalise_map(text)
+                self.assertEqual(len(normalised), len(source))
+                for index in source:
+                    self.assertTrue(0 <= index < len(base))
+
+    def test_base_span_restores_a_stripped_tone_mark(self):
+        text = "วันนี้"
+        normalised, source, base = thai_g2p.normalise_map(text)
+        syllables = thai_g2p.phonemize(text).syllables
+        start, end = thai_g2p.base_span(syllables[-1].span, source, base)
+        self.assertTrue(base[start:end].endswith("\u0e49"))
+
+    def test_base_span_restores_a_silenced_consonant(self):
+        text = "สตางค์"
+        normalised, source, base = thai_g2p.normalise_map(text)
+        syllables = thai_g2p.phonemize(text).syllables
+        _, end = thai_g2p.base_span(syllables[-1].span, source, base)
+        self.assertEqual(end, len(base))
+
+    def test_base_span_does_not_swallow_the_next_word(self):
+        text = "ดีมาก"
+        normalised, source, base = thai_g2p.normalise_map(text)
+        first = thai_g2p.phonemize(text).syllables[0]
+        start, end = thai_g2p.base_span(first.span, source, base)
+        self.assertEqual(base[start:end], "ดี")
+
+    def test_an_empty_span_is_empty(self):
+        normalised, source, base = thai_g2p.normalise_map("นารา")
+        self.assertEqual(thai_g2p.base_span((2, 2), source, base), (0, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

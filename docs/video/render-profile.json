@@ -1,0 +1,61 @@
+{
+  "$comment": "Encoder settings and the renderer contract (PHASE 9). Separated from camera-model.json because framing is a creative decision and encoding is a delivery one; they change for different reasons and by different people. See DECISIONS.md ADR-032.",
+  "version": "1.0",
+
+  "default_profile": "narration-1080p",
+
+  "profiles": {
+    "narration-1080p": {
+      "$comment": "yuv420p and the even-dimension requirement are not preferences - a 4:2:0 encode of an odd-sized frame is rejected by libx264, and yuv444 will not play in Safari or on most TVs.",
+      "container": "mp4",
+      "video_codec": "libx264",
+      "pixel_format": "yuv420p",
+      "crf": 18,
+      "preset": "slow",
+      "audio_codec": "aac",
+      "audio_bitrate": "192k",
+      "faststart": true
+    },
+    "review-720p": {
+      "$comment": "For sending someone a link. Small, fast, and never the deliverable.",
+      "container": "mp4",
+      "scale_height": 720,
+      "video_codec": "libx264",
+      "pixel_format": "yuv420p",
+      "crf": 24,
+      "preset": "veryfast",
+      "audio_codec": "aac",
+      "audio_bitrate": "128k",
+      "faststart": true
+    }
+  },
+
+  "engines": {
+    "$comment": "Render targets, in the sense ADR-021 gives the word for TTS: the plan is the contract and an engine consumes it. `ffmpeg` is the reference engine and the only implemented one. `hyperframes` is declared because PLAN section 9 names it, and is unimplemented because the tool is not present in this repository and cannot be inspected, versioned, or verified from here (ADR-032).",
+    "default": "ffmpeg",
+    "available": {
+      "ffmpeg": {
+        "status": "implemented",
+        "requires": ["ffmpeg on PATH"],
+        "composites_with": "Pillow",
+        "subtitles": "sidecar, or burned in through libass"
+      },
+      "hyperframes": {
+        "status": "declared, not implemented",
+        "requires": ["HyperFrames", "a Node runtime", "GSAP"],
+        "consumes": "the same video plan; camera.frames are authoritative over keyframes",
+        "blocked_on": "the tool is not available here to inspect or pin a version of"
+      }
+    }
+  },
+
+  "requirements": {
+    "$comment": "What render_video.py --check probes for. Each is reported as present or missing with the reason it matters, so a failed render is diagnosed before it starts rather than a third of the way through.",
+    "frames": "PHASE 8 rendered PNG frames for the animation being assembled",
+    "audio": "the WAV the timeline was fitted to",
+    "ffmpeg": "encoding and muxing",
+    "pillow": "per-frame scene compositing",
+    "font": "a Thai-capable font file, only when burning subtitles in",
+    "shaping": "Raqm/HarfBuzz in Pillow, only when burning subtitles in"
+  }
+}

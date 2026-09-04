@@ -1,0 +1,86 @@
+{
+  "$comment": "Camera framing and motion for the video layer (PHASE 9). A camera move here is a transform over the rendered avatar frames, not a re-generation - it can only ever reframe pixels that already exist. See DECISIONS.md ADR-034.",
+  "version": "1.0",
+
+  "canvas": {
+    "$comment": "16:9 because the avatar assets are 1:1 and the remaining width is where subtitles, b-roll, and lower thirds live. fps is never set here - it is inherited from the frame plan, so the video cannot disagree with the lip-sync it carries.",
+    "width": 1920,
+    "height": 1080,
+    "background": "#000000",
+    "fps": "inherited from the animation plan"
+  },
+
+  "avatar": {
+    "$comment": "source_resolution is ASSET_SPEC section 1. height_fraction leaves headroom: at 0.82 of a 1080 canvas the avatar draws at 886px from a 1024px source, so a push-in of up to 1.156x still samples down. Past that the renderer is inventing detail.",
+    "source_resolution": 1024,
+    "height_fraction": 0.82,
+    "anchor": "bottom-center",
+    "offset_x_fraction": 0.0,
+    "offset_y_fraction": 0.0
+  },
+
+  "class_ratios": {
+    "$comment": "visual-spec.md section 2, head height as a ratio to close-up (ADR-014). A camera cannot cross a class: pushing a three-quarter pose into close-up framing enlarges a head that was rendered at 0.48 of the close-up size, and every skin and hair detail the close-up assets have is simply absent.",
+    "close-up": 1.0,
+    "medium": 0.71,
+    "upper-body": 0.60,
+    "three-quarter": 0.48
+  },
+
+  "limits": {
+    "$comment": "max_sampling_ratio 1.0 means: never draw a source pixel larger than one output pixel. It is a WARN and not a FAIL because a 1.05 overshoot on one frame of a slow push is not visible, while refusing it outright would make every push-in unusable.",
+    "max_sampling_ratio": 1.0,
+    "max_scale": 1.35,
+    "min_scale": 0.6,
+    "max_scale_change_per_second": 0.12,
+    "max_pan_fraction_per_second": 0.06,
+    "max_pan_fraction": 0.25
+  },
+
+  "easing": {
+    "$comment": "GSAP easing names (ADR-032). The sampled per-frame values in the plan are what a renderer must use; these names travel with them so a GSAP renderer can reproduce the same curve rather than approximate it.",
+    "supported": ["none", "power1.in", "power1.out", "power1.inOut",
+                  "power2.in", "power2.out", "power2.inOut",
+                  "power3.inOut", "sine.inOut"],
+    "default": "sine.inOut"
+  },
+
+  "moves": {
+    "$comment": "Named presets. scale is relative to the avatar's resting size; pan is a fraction of canvas width/height. A narration camera that moves faster than this stops being a camera and becomes an effect.",
+    "static": {
+      "description": "no movement - the default, and correct for most narration",
+      "keyframes": [{"t": 0.0, "scale": 1.0, "x": 0.0, "y": 0.0, "ease": "none"}]
+    },
+    "slow-push": {
+      "description": "imperceptible push in over the whole clip; adds attention without announcing itself",
+      "keyframes": [
+        {"t": 0.0, "scale": 1.0, "x": 0.0, "y": 0.0, "ease": "sine.inOut"},
+        {"t": 1.0, "scale": 1.08, "x": 0.0, "y": 0.0, "ease": "sine.inOut"}
+      ]
+    },
+    "slow-pull": {
+      "description": "reverse of slow-push; opens the frame as a section closes",
+      "keyframes": [
+        {"t": 0.0, "scale": 1.08, "x": 0.0, "y": 0.0, "ease": "sine.inOut"},
+        {"t": 1.0, "scale": 1.0, "x": 0.0, "y": 0.0, "ease": "sine.inOut"}
+      ]
+    },
+    "settle": {
+      "description": "starts fractionally wide and settles; hides the first-frame cut",
+      "keyframes": [
+        {"t": 0.0, "scale": 1.05, "x": 0.0, "y": 0.0, "ease": "power2.out"},
+        {"t": 0.25, "scale": 1.0, "x": 0.0, "y": 0.0, "ease": "none"},
+        {"t": 1.0, "scale": 1.0, "x": 0.0, "y": 0.0, "ease": "none"}
+      ]
+    },
+    "drift-left": {
+      "description": "slow lateral drift, for a pointing or presenting pose that needs space on one side",
+      "keyframes": [
+        {"t": 0.0, "scale": 1.04, "x": 0.03, "y": 0.0, "ease": "sine.inOut"},
+        {"t": 1.0, "scale": 1.04, "x": -0.03, "y": 0.0, "ease": "sine.inOut"}
+      ]
+    }
+  },
+
+  "default_move": "static"
+}

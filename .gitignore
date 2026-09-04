@@ -56,6 +56,13 @@ metadata/animations/**
 assets/frames/**
 !assets/frames/.gitkeep
 
+# PHASE 9 output. Video plans are reproducible from a frame plan and its timeline;
+# the composited scene frames, subtitle sidecars, and MP4s are all derived from them.
+metadata/videos/**
+!metadata/videos/.gitkeep
+assets/video/**
+!assets/video/.gitkeep
+
 # --- Audio --------------------------------------------------------
 *.wav
 *.mp3

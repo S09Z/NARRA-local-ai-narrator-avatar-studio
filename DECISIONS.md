@@ -1218,7 +1218,7 @@ laptop is not. `make status` reports where the project stands; it does not say w
 do about it, and deliberately should not.
 
 Decision:
-Two artefacts, not one. `GUIDELINE.md` is the ordered procedure — fourteen steps, each
+Two artefacts, not one. `GUIDELINE.md` is the ordered procedure — fifteen steps as of PHASE 9, each
 naming the machine it runs on, the commands, the pass criterion, and what it blocks.
 `scripts/utilities/demo_run.py`, behind `make demo`, walks the checkable subset of those
 steps, prints the real command before running it, and reports `OK` / `TODO` / `BLOCKED`.
@@ -1246,7 +1246,7 @@ copy away from `character/`, and would teach the pipeline's shape while hiding t
 fact that currently matters — that 0 of 38 assets exist.
 
 Alternatives rejected:
-- Folding the procedure into `README.md`: the README orients a reader; a fourteen-step
+- Folding the procedure into `README.md`: the README orients a reader; a fifteen-step
   runbook buried in it serves neither purpose.
 - Extending `status.py` with a `--walkthrough` mode: status collects facts and prints
   them. Running eight subprocesses and teaching an order is a different job, and ADR-028
@@ -1262,3 +1262,243 @@ BLOCKED 2, and names filling the character bible as the next action — the same
 `make status` gives, arrived at by walking the steps rather than by knowing where to
 look. When a step's command changes, the demo breaks loudly and the guideline must be
 edited with it; that coupling is the point.
+
+---
+
+## ADR-032 — HyperFrames and GSAP are render targets, not dependencies
+
+Date: 2026-09-03
+Status: accepted
+
+Context:
+PLAN §9 names HyperFrames as the compositor, timeline engine, subtitle renderer,
+camera and final renderer, and GSAP as the thing driving mouth, head, camera, text,
+and expression transitions. Neither is present in this repository. HyperFrames appears
+in no file outside the planning documents, is not installed, and cannot be inspected,
+version-pinned, or checked for conflicts — the three things `CLAUDE.md` requires before
+a dependency is added. GSAP is a browser animation library and implies a Node runtime
+and a headless browser, a dependency surface larger than the entire project, which
+today is Pillow and pytest (ADR-029).
+
+Decision:
+PHASE 9 produces a **video plan**: a complete, validated, renderer-independent document
+describing the finished video. Renderers are adapters over it, in the sense ADR-021
+gives the word for TTS. `ffmpeg` is the reference engine and the only implemented one.
+`hyperframes` is declared in `docs/video/render-profile.json` with status
+`"declared, not implemented"` and the reason it is blocked, and `validate_video.py`
+fails any plan that names an unimplemented engine.
+
+Two properties make the plan portable rather than merely ffmpeg-shaped. Camera motion
+carries GSAP easing names, so a GSAP renderer reproduces the curve instead of guessing
+at it. And camera motion also carries the curve already sampled, one entry per frame,
+with the plan marking `"authoritative": "frames"` — the samples are the contract, so
+two renderers agree by reading the same numbers rather than by easing alike.
+
+Rationale:
+Wiring up a tool that cannot be run here would produce code nobody has executed, in a
+phase already three gates ahead of its assets. Declaring it and building the artefact
+it would consume costs nothing now and makes adding it later an adapter rather than a
+rewrite. It also keeps the honest answer visible in the artefacts: a plan says which
+engine made it, and the engine registry says which engines are real.
+
+Alternatives rejected:
+- Implement a GSAP renderer through Playwright: adds Node, a browser, and a headless
+  screenshot pipeline to encode 118 frames that Pillow composites directly. The browser
+  would be doing compositing, not animation, since the tracks are already sampled.
+- Wait for HyperFrames before building PHASE 9: leaves subtitles, camera, and the plan
+  format unbuilt for an unknown period, when all three are decidable now.
+- Treat ffmpeg as the only engine and drop the abstraction: PLAN §9 names HyperFrames,
+  and silently dropping a named requirement is not a decision, it is an omission.
+
+Impact:
+No MP4 has been produced — ffmpeg is not installed on the development machine, so the
+encode path has never run. `render_video.py --check` reports that per requirement.
+`ffmpeg_command()` is a pure function returning argv, so the exact call is tested
+without an encoder present.
+
+---
+
+## ADR-033 — Thai subtitles break at word boundaries recovered from the PHASE 7 parse
+
+Date: 2026-09-03
+Status: accepted
+
+Context:
+Thai is written without spaces between words. Every general-purpose subtitle wrapper
+breaks on whitespace or on a character count, and both are wrong here: a character-count
+break splits a word, orphans a final consonant, or lands between a consonant and the
+vowel or tone mark that sits on it. The last case does not produce an ugly line, it
+produces a different string. PHASE 7 already segments the sentence to phonemize it, so
+the boundary information exists; the timeline just does not store it.
+
+Decision:
+Cues are built from the PHASE 7 segmentation, re-derived from the text the timeline
+records. The timeline's recorded syllable count is checked against the re-parse and a
+mismatch is refused, because a parse that changed under a timeline would give the right
+mouth shapes to the wrong words with nothing downstream noticing.
+
+Three additions to `thai_g2p.py` support it, placed there rather than in PHASE 9 because
+that module owns segmentation (ADR-011):
+
+- `Syllable.span` — where a syllable came from, in the normalised text. Text alone is
+  not enough: a lexicon entry covers several syllables, and two adjacent identical words
+  would collapse into one.
+- `normalise_map()` — `normalise()` plus the index of the source character behind every
+  surviving one. `normalise()` now delegates to it, so there is one implementation.
+- `base_span()` — the inverse walk, back over what normalisation deleted.
+
+Rationale:
+Normalisation strips exactly the characters a reader most needs: tone marks, because
+tone does not change mouth shape, and consonants silenced by thanthakhat. Displaying
+the normalised form would show `วันนี` for `วันนี้` and `สตาง` for `สตางค์` — different words,
+in a subtitle, in the product's own language. Mapping back is the only way to have
+correct phonemes and correct spelling from one parse.
+
+Alternatives rejected:
+- Wrap on character count: the failure this exists to prevent.
+- Add a Thai word segmenter (pythainlp, ICU): a third dependency, a second segmentation
+  that would disagree with the one driving the visemes, and two different notions of
+  where a word ends in the same video.
+- Store syllable spans in the timeline: changes the PHASE 7 schema for a PHASE 9 need,
+  and the information is derivable from what is already recorded.
+- Re-implement the normalisation index map inside `subtitle.py`: a second copy of
+  stripping rules that would drift from the first.
+
+Impact:
+`tests/audio/test_thai_g2p.py` gained span and mapping tests; the existing 21 pass
+unchanged. Line breaking is only as good as the parse — the same parse whose viseme
+mapping is still unreviewed by a Thai speaker (PHASE 4.2). The reading-speed and line-
+length numbers in `subtitle-style.json` come from the Netflix Thai style guide and are
+equally unreviewed.
+
+---
+
+## ADR-034 — Camera moves are bounded by source resolution and camera class
+
+Date: 2026-09-03
+Status: accepted
+
+Context:
+A camera move in this pipeline is a transform over rendered 1024x1024 avatar frames. It
+cannot generate detail. Past a certain scale a push-in stops being a camera move and
+becomes an upscale, and the character's identity — the thing six phases of work exist
+to hold stable — degrades in a way no downstream step can repair.
+
+Decision:
+`docs/video/camera-model.json` carries the numeric limits and `camera.check_limits()`
+holds every plan to them. Two bounds are about pixels: `max_sampling_ratio` of 1.0
+(never draw a source pixel larger than one output pixel) and hard `max_scale` /
+`min_scale`. Two are about motion: `max_scale_change_per_second` and
+`max_pan_fraction`. One is about framing: scale may not take the head past what a
+close-up asset shows, derived as `1 / class_ratio` from `visual-spec.md` §2 (ADR-014).
+
+The numeric bounds fail. The framing bound and the sampling ratio warn.
+
+Rationale:
+The avatar draws at 886px from a 1024px source at rest, so there is real headroom, and
+refusing every push-in outright would make the shipped `slow-push` preset unusable. But
+a 1.3x push on a `three-quarter` pose is a 1.16 sampling ratio — visibly soft — and
+that has to be said. Splitting fail from warn along "the model's own numbers" versus
+"a creative call with a cost" keeps `--strict` meaningful: a release render can turn
+every warning into a failure, and an iteration render need not.
+
+Alternatives rejected:
+- Allow any scale and rely on judgement: the whole repository is built on the opposite
+  premise, that the checkable things are checked.
+- Fail on any upscale: `slow-push` at 1.08 on a close-up asset is ordinary filmmaking
+  and looks fine; a rule that forbids it would be routed around.
+- Render at the source resolution and never scale: gives up camera movement entirely,
+  which PLAN §9 asks for by name.
+
+Impact:
+Every preset in the model is tested against the limits the same file declares, so a
+shipped move that violates a shipped limit is a test failure rather than a surprise.
+`max_scale_change_per_second` is a judgement made without having watched footage, and
+is listed for re-tuning in `docs/video/phase-9-video-pipeline.md` §8.
+
+---
+
+## ADR-035 — Subtitles ship as a timed-text sidecar; burn-in goes through libass
+
+Date: 2026-09-03
+Status: accepted
+
+Context:
+PLAN §9 lists subtitle rendering. The obvious implementation — draw the text onto each
+frame with Pillow, which is already a dependency — does not work for Thai. Pillow shapes
+complex scripts only when built against Raqm, and `PIL.features.check("raqm")` is
+`False` on the development machine. Without shaping, Thai tone marks and vowel signs are
+positioned by glyph advance: they render beside the consonant instead of above or below
+it. The text is legible enough to pass a glance and wrong to any Thai reader.
+
+Decision:
+Subtitles are emitted as a sidecar file — SRT by default, ASS when styling is needed —
+and burn-in is off by default. When a plan does ask for burn-in, the text is drawn by
+ffmpeg's libass, which shapes through HarfBuzz unconditionally, and never by Pillow.
+`validate_video.py` fails a plan that sets `burn_in` without the `.ass` format, and
+`render_video.py --check` probes for libass in the installed ffmpeg and refuses without
+it. Pillow composites the avatar and never draws a glyph.
+
+Rationale:
+Shaping is the deciding constraint, but the sidecar earns its place twice over. This
+pipeline still needs a Thai speaker to review the viseme mapping, outstanding since
+PHASE 4.2; the subtitle timing now needs the same review. An `.srt` is a file a
+reviewer can open, correct, and hand back. Text burned into pixels cannot be corrected
+without re-rendering, and cannot be diffed at all.
+
+Alternatives rejected:
+- Require a Raqm-enabled Pillow: a build-flag dependency that cannot be expressed in
+  `pyproject.toml`, and would fail silently on any machine without it — the exact
+  failure mode this avoids.
+- Draw with ffmpeg's `drawtext` filter: does not shape either, so it fails the same way.
+- Burn in by default because "a narration video needs open captions": true for
+  distribution, and a decision for the person publishing, made once with a
+  `--burn-in` flag rather than baked into every render.
+
+Impact:
+No burned-in render has been produced or verified, because no ffmpeg is installed to
+verify it with. The claim that libass shapes Thai correctly is from its documentation,
+not from this pipeline's output, and stays untested until §8 of the phase doc is worked
+through.
+
+---
+
+## ADR-036 — PHASE 9 was also built before the PHASE 6 gate passed
+
+Date: 2026-09-03
+Status: accepted, under protest recorded
+
+Context:
+`CLAUDE.md` blocks lip-sync, HyperFrames, TTS, audio, and video work until the image
+library is production-locked. PHASE 7 was built ahead of it on explicit instruction
+(ADR-023) and PHASE 8 on the same (ADR-027). PHASE 9 was requested the same way. The
+gate still fails on 7 blocking problems with 0 of 38 image assets.
+
+Decision:
+Build it, on the same terms as ADR-023 and ADR-027: the gate is not modified, not
+weakened, and not worked around; every claim about what has been verified is scoped to
+what was actually run; and this entry records the cost.
+
+Rationale:
+The instruction is explicit and repeated, and the phase is not idle work — the video
+plan, the Thai subtitle segmentation, and the camera limits are all decidable without a
+single generated asset, and all three were exercised against real Thai text and real
+PHASE 7/8 artefacts. What cannot be exercised is named rather than simulated.
+
+The cost differs from PHASE 7's and PHASE 8's, and is worth stating exactly. PHASE 7
+was text and audio and was fully testable. PHASE 8 composites images that do not exist,
+and was tested against synthetic PNGs. PHASE 9 inherits that gap and adds a second one:
+its output stage needs ffmpeg, which is not installed here, so the encode path has
+never run at all — not against synthetic data, not against anything.
+
+Alternatives rejected:
+- Refuse until PHASE 6 passes: the instruction was explicit and repeated across three
+  phases; a refusal here would be re-litigating a settled decision.
+- Simulate an encode so the path appears exercised: would put an untested claim into
+  the record, which is the one thing these ADRs exist to prevent.
+
+Impact:
+Three phases now depend on assets that do not exist, and one depends on a binary that
+is not installed. `make demo` and `make status` both report the gate failing.
+Nothing in PHASE 7, 8, or 9 should be described as working until a real asset has been
+generated, composited, and encoded.

@@ -44,6 +44,7 @@ VALIDATION_DIR = REPO / "metadata" / "validation"
 LOCK_FILE = REPO / "metadata" / "production-lock.json"
 TIMELINE_DIR = REPO / "metadata" / "timelines"
 ANIMATION_DIR = REPO / "metadata" / "animations"
+VIDEO_DIR = REPO / "metadata" / "videos"
 FRAME_DIR = REPO / "assets" / "frames"
 
 # prompts/README.md 3: <name>-v<major>.<minor>.md
@@ -163,13 +164,14 @@ def lock():
 
 
 def artefacts():
-    """PHASE 7 and PHASE 8 output. Generated, gitignored, and cheap to count."""
+    """PHASE 7-9 output. Generated, gitignored, and cheap to count."""
     def count(directory, pattern):
         return len(list(directory.glob(pattern))) if directory.is_dir() else 0
     return {"timelines": count(TIMELINE_DIR, "*.json"),
             "animations": count(ANIMATION_DIR, "*.json"),
             "frame_sets": len([p for p in FRAME_DIR.iterdir() if p.is_dir()])
-            if FRAME_DIR.is_dir() else 0}
+            if FRAME_DIR.is_dir() else 0,
+            "video_plans": count(VIDEO_DIR, "*.json")}
 
 
 def collect(run_gate=True):
@@ -253,11 +255,12 @@ def render(state, verbose=False):
                          f"{lock_state['locked_at']}"))
     lines.append("")
 
-    lines.append("Generated artefacts (PHASE 7-8)")
+    lines.append("Generated artefacts (PHASE 7-9)")
     art = state["artefacts"]
     lines.append(row("timelines", art["timelines"]))
     lines.append(row("animations", art["animations"]))
     lines.append(row("frame sets", art["frame_sets"]))
+    lines.append(row("video plans", art["video_plans"]))
     lines.append("")
 
     lines.append("Next")

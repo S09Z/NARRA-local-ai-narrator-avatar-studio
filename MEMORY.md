@@ -67,7 +67,11 @@ viseme assets, because none exist.
 Phase 8: lip-sync engine complete and tested, built ahead of the image gate on
 the same instruction (ADR-027). Tested only against synthetic assets - no real
 viseme has ever been composited onto a real expression.
-Phase 9–10: planned, blocked by image-generation gate.
+Phase 9: video pipeline complete and tested, built ahead of the image gate on the
+same instruction for the third time (ADR-036). Plans, camera, and Thai subtitles are
+exercised against real PHASE 7/8 artefacts; scene compositing only against synthetic
+PNGs; the encode path has never run, because ffmpeg is not installed here.
+Phase 10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
 
@@ -229,6 +233,24 @@ Decision:
 Reason:
 Impact:
 
+### Phase 9 — Video Pipeline
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| Video plan | `scripts/lib/videoplan.py`, `scripts/video/build_video.py` | Complete — plan/render split one layer up (ADR-032) |
+| Camera | `scripts/lib/camera.py`, `docs/video/camera-model.json` | Complete — GSAP easing, sampled frames authoritative; limits bound scale, speed, pan, framing (ADR-034) |
+| Subtitles | `scripts/lib/subtitle.py`, `docs/video/subtitle-style.json` | Complete — cues break at PHASE 7 word boundaries; **timing numbers unreviewed by a Thai speaker** (ADR-033) |
+| Subtitle output | `.srt` / `.ass` sidecar | Complete — burn-in via libass only; Pillow here has no Raqm and cannot shape Thai (ADR-035) |
+| Compositing | `scripts/video/render_video.py` | Complete — **verified against synthetic PNGs only** |
+| Encoding | `ffmpeg_command()`, `encode()` | Written — **never run; ffmpeg is not installed** |
+| HyperFrames / GSAP | `docs/video/render-profile.json` engine registry | Declared, not implemented — the tool is not present to inspect or pin (ADR-032) |
+| B-roll | `broll` track in the plan | Declared and validated; nothing composites into it, and no b-roll assets exist |
+| QC | `scripts/validation/validate_video.py` | Complete — 26 checks, 30 negative tests |
+| Runbook | `docs/video/phase-9-video-pipeline.md` | Written — quick start verified as far as `--check` |
+
+No MP4 has been produced. `thai_g2p.py` gained `Syllable.span`, `normalise_map()`, and
+`base_span()` so subtitles can show `วันนี้` rather than the `วันนี` phonemization works on.
+
 ### 2026-08-25 — Reference filename, diagnostic seeds
 Context: PHASE 1 implementation surfaced two unspecified details.
 Decision: Reference is `narra-reference-master-v1.png` with a byte-identical `master.png`
@@ -378,7 +400,7 @@ opacity with a tolerance instead of `== 255` is still open.
 Context: "what do I run next, and where does it stop" had no home — it meant assembling
 eight commands out of four documents, and `make status` reports the project's state
 without saying what to do about it.
-Decision: `GUIDELINE.md` (fourteen ordered steps, each with its machine, commands, pass
+Decision: `GUIDELINE.md` (ordered steps, each with its machine, commands, pass
 criterion, and what it blocks) plus `scripts/utilities/demo_run.py` behind `make demo`
 (ADR-031).
 Reason: a document alone goes stale; a command alone cannot explain why the order is the
@@ -387,3 +409,53 @@ apart unnoticed.
 Impact: `make demo` writes nothing, always exits 0, and reports BLOCKED rather than
 simulating generation — no placeholder asset is ever created. It currently reports
 OK 3 / TODO 3 / BLOCKED 2, next action: fill the character bible.
+
+### 2026-09-03 — HyperFrames is a render target, not a dependency
+Context: PLAN §9 names HyperFrames and GSAP, and neither is present in this repository.
+HyperFrames cannot be inspected, version-pinned, or conflict-checked — the three things
+CLAUDE.md requires before adding a dependency — and GSAP implies Node plus a headless
+browser, a larger surface than the whole project.
+Decision: PHASE 9 emits a renderer-independent video plan; engines are adapters over it.
+ffmpeg is implemented, hyperframes is declared with its blocker recorded (ADR-032).
+Reason: the plan is the artefact worth building now, and it makes adding an engine later
+an adapter rather than a rewrite.
+Impact: camera motion carries GSAP easing names and the same curve already sampled per
+frame, marked authoritative — that is how two renderers agree. validate_video.py fails
+any plan naming an unimplemented engine.
+
+### 2026-09-03 — Thai subtitles break where PHASE 7 says a word ends
+Context: Thai has no spaces between words, so a character-count wrap splits words and
+can separate a tone mark from its consonant, which changes the string rather than the
+line. PHASE 7 already segments the sentence; the timeline just does not store it.
+Decision: re-derive the parse from the recorded text, check the recorded syllable count,
+and break only between words. thai_g2p gained Syllable.span, normalise_map(), and
+base_span() so display text keeps its tone marks and silenced consonants (ADR-033).
+Reason: normalisation strips exactly what a reader most needs to see; mapping back is
+the only way to have correct phonemes and correct spelling from one parse.
+Impact: a syllable-count mismatch is refused, not patched. The subtitle timing numbers
+come from the Netflix Thai style guide and are unreviewed — as is the viseme mapping
+they sit downstream of, outstanding since PHASE 4.2.
+
+### 2026-09-03 — Pillow cannot draw Thai; subtitles are a sidecar
+Context: the obvious subtitle implementation is drawing text per frame with Pillow.
+PIL.features.check("raqm") is False here, so tone marks are placed by glyph advance and
+land beside the consonant instead of above it — legible to a glance, wrong to a reader.
+Decision: emit .srt/.ass sidecars, burn-in off by default, and when on, draw through
+ffmpeg's libass. Pillow composites the avatar and never draws a glyph (ADR-035).
+Reason: shaping decides it, and a sidecar is also the artefact a Thai reviewer can
+correct — burned-in text cannot be changed without a re-render or diffed at all.
+Impact: no burned-in render has been verified; libass shaping Thai correctly is from its
+documentation, not from this pipeline's output.
+
+### 2026-09-03 — PHASE 9 built ahead of the gate, for the third time
+Context: CLAUDE.md blocks video work until the image library is locked. The gate fails
+on 7 problems with 0/38 assets. PHASE 7 (ADR-023) and PHASE 8 (ADR-027) were built ahead
+of it on explicit instruction; PHASE 9 was requested the same way.
+Decision: build it; do not touch the gate; scope every claim to what actually ran
+(ADR-036).
+Reason: plans, camera arithmetic, and Thai segmentation are all decidable without a
+generated asset, and were exercised against real PHASE 7/8 artefacts.
+Impact: the gap is now two deep, not one. PHASE 8 was tested against synthetic PNGs;
+PHASE 9 inherits that and adds an encode path that has never run at all, because ffmpeg
+is not installed. Nothing in PHASE 7-9 should be called working until one real asset has
+been generated, composited, and encoded.
