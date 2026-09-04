@@ -52,7 +52,8 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 
 ## Current Status
 
-Phase 0: not started — no ComfyUI, no models, no GPU environment yet.
+Phase 0: runbook written (`docs/operations/phase-0-environment-setup.md`), NOT RUN —
+no ComfyUI, no models, no GPU environment yet. Must run on the RTX 5070 machine.
 Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
 Phase 2: prompt system complete, blocked on the same inputs.
 Phase 3: prompts + QC tooling complete, no assets generated.
