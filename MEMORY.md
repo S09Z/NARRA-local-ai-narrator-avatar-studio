@@ -60,7 +60,10 @@ Phase 3: prompts + QC tooling complete, no assets generated.
 Phase 4: prompts + mapping + QC tooling complete, no assets generated.
 Phase 5: prompts + camera classes + compositions complete, no assets generated.
 Phase 6: gate + lock tooling complete, GATE NOT PASSED — 0/38 assets exist.
-Phase 7–10: planned, blocked by image-generation gate.
+Phase 7: audio/phoneme pipeline complete and tested, built ahead of the
+image gate by explicit instruction (ADR-023). Unvalidated against real
+viseme assets, because none exist.
+Phase 8–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
 
@@ -150,6 +153,29 @@ Two checks were wrong before PHASE 6 and are fixed:
   failed all 10; it is now measured within a camera class (ADR-018)
 - a per-asset `mouth_anchor` is only required once the PHASE 4.3 baseline is measured
 
+### Phase 7 — Thai Audio / Phoneme Pipeline
+
+Built ahead of the PHASE 6 gate on explicit instruction. The gate was **not** modified and
+still fails on 8 problems (ADR-023).
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 7.1 TTS | `scripts/audio/tts.py`, adapters `say` + `silence` | Complete — `say`/Kanya verified byte-deterministic; **production engine not selected** |
+| 7.2 Phoneme analysis | `scripts/lib/thai_g2p.py`, `docs/audio/thai-lexicon.json` | Complete — rule parser + 20-entry lexicon; pythainlp is the recommended external engine, not installed |
+| 7.3 Phoneme → viseme | `scripts/lib/viseme_map.py`, `docs/thai-viseme/thai-viseme-map.json` | Complete — JSON checked against the 4.2 markdown by test (ADR-019) |
+| 7.4 Timeline | `scripts/lib/timeline.py`, `scripts/audio/build_timeline.py` | Complete — `timeline.json` per PLAN 7.4, plus provenance and digest (ADR-022) |
+| QC | `scripts/validation/validate_timeline.py` | Complete — 15 negative tests |
+| Runbook | `docs/audio/phase-7-audio-pipeline.md` | Written — quick start verified end to end |
+
+78 tests, all passing; 279 across the repository. Verified end to end on real Thai audio:
+text → `say` (Kanya) → 4.374s WAV → 29-event timeline → validator PASS.
+
+What is **not** validated:
+- no timing or shape has been seen against a real viseme image — 0/38 assets exist
+- the Thai mapping is still unreviewed by a Thai speaker (PHASE 4.2)
+- the duration model has never been checked against a measured alignment
+- nothing emits `timing_source: aligned`; the best available is `fitted`
+
 ## Decision Log
 
 Add dated decisions here.
@@ -233,3 +259,23 @@ within their camera class against the same 1% tolerance (ADR-018).
 Reason: ASSET_SPEC §2 and §8 already define pose consistency as within-class. Comparing a
 three-quarter shot to a close-up measures the camera move, not a defect.
 Impact: head *height* per class stays a human check — alpha cannot separate head from body.
+
+### 2026-08-27 — PHASE 7 built ahead of the image gate
+Context: PLAN, CLAUDE.md, and README all gate PHASE 7 behind a passing PHASE 6.
+`lock_library.py` fails on 8 problems and 0/38 assets exist.
+Decision: PHASE 7 implemented on the owner's explicit, repeated instruction after the
+conflict was raised and overruled. The gate was not modified (ADR-023).
+Reason: the owner's instruction outranks the plan the owner wrote; an override recorded
+with its cost keeps the gate meaningful, a bypassed one does not.
+Impact: PHASE 8 stays blocked. Every timeline carries `timing_source` and the unreviewed-
+mapping warning, so nothing downstream can mistake an estimate for a measurement.
+
+### 2026-08-27 — Thai G2P is rules plus a lexicon, not a dictionary
+Context: Thai spelling underdetermines pronunciation; ดีครับ is /diː.kʰrap/ and no rule
+says so.
+Decision: score whole segmentations rather than matching greedily, and override the
+remainder from `docs/audio/thai-lexicon.json` (ADR-020).
+Reason: rule patches interact unboundedly and their damage is invisible; a lexicon entry
+is scoped to one word and is data, not code.
+Impact: `build_timeline.py --report` is the way to find lexicon candidates. Coverage is
+recorded per timeline and a build below 95% exits non-zero.

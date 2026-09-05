@@ -46,6 +46,12 @@ assets/contact-sheets/**
 *.avi
 *.gif
 
+# --- Generated timelines ------------------------------------------
+# PHASE 7 output. Built from text by build_timeline.py and reproducible from it;
+# they reference WAV files that are themselves never committed.
+metadata/timelines/**
+!metadata/timelines/.gitkeep
+
 # --- Audio --------------------------------------------------------
 *.wav
 *.mp3
