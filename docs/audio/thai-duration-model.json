@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "phase": "7.4",
+  "note": "Relative duration estimates per phoneme class at a neutral Thai speaking rate. These are ESTIMATES, not measurements. Their job is to distribute a known audio duration across visemes in a plausible ratio (timing_source=fitted), or to produce a standalone approximation when no audio exists (timing_source=estimated). Forced alignment replaces them entirely (timing_source=aligned).",
+
+  "class_duration_s": {
+    "stop":          0.055,
+    "affricate":     0.075,
+    "fricative":     0.100,
+    "nasal":         0.070,
+    "liquid":        0.060,
+    "glide":         0.055,
+    "glottal":       0.020,
+    "vowel_short":   0.095,
+    "vowel_long":    0.190,
+    "diphthong":     0.210,
+    "final_stop":    0.070,
+    "final_nasal":   0.085,
+    "final_glide":   0.075,
+    "silence":       0.150
+  },
+
+  "phoneme_class": {
+    "k": "stop", "kʰ": "stop", "t": "stop", "tʰ": "stop",
+    "p": "stop", "pʰ": "stop", "d": "stop", "b": "stop",
+    "tɕ": "affricate", "tɕʰ": "affricate",
+    "s": "fricative", "f": "fricative", "h": "fricative",
+    "m": "nasal", "n": "nasal", "ŋ": "nasal",
+    "l": "liquid", "r": "liquid",
+    "j": "glide", "w": "glide",
+    "ʔ": "glottal",
+
+    "a": "vowel_short", "ɛ": "vowel_short", "e": "vowel_short",
+    "i": "vowel_short", "ɨ": "vowel_short", "u": "vowel_short",
+    "o": "vowel_short", "ɔ": "vowel_short", "ə": "vowel_short",
+
+    "aː": "vowel_long", "ɛː": "vowel_long", "eː": "vowel_long",
+    "iː": "vowel_long", "ɨː": "vowel_long", "uː": "vowel_long",
+    "oː": "vowel_long", "ɔː": "vowel_long", "əː": "vowel_long",
+
+    "ia": "diphthong", "ɨa": "diphthong", "ua": "diphthong",
+
+    "p̚": "final_stop", "t̚": "final_stop", "k̚": "final_stop"
+  },
+
+  "final_class": {
+    "m": "final_nasal", "n": "final_nasal", "ŋ": "final_nasal",
+    "w": "final_glide", "j": "final_glide"
+  },
+
+  "min_viseme_duration_s": 0.060,
+  "sentence_final_rest_s": 0.150,
+  "word_gap_s": 0.0,
+
+  "min_duration_rationale": "mapping.md section 6 - a viseme held for one frame reads as a flicker. 0.060s is under 2 frames at 25fps and under 2 frames at 30fps; PHASE 8 decides the frame rate and may raise this."
+}

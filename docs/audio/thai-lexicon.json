@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "phase": "7.2",
+  "note": "Exception lexicon for scripts/lib/thai_g2p.py. Thai spelling is ambiguous in places no rule can settle - a consonant between two vowels can be the coda of one syllable or the onset of the next, and both readings are legal. The rule parser guesses; entries here override the guess. Keys are Thai surface forms WITH tone marks stripped, values are IPA syllables. This is a starting lexicon seeded from parser errors found in PHASE 7, not a pronunciation dictionary - add to it whenever build_timeline.py --report shows a word coming out wrong.",
+
+  "words": {
+    "ครับ": ["kʰrap̚"],
+    "คะ": ["kʰa"],
+    "คับ": ["kʰap̚"],
+    "อร่อย": ["ʔa", "rɔːj"],
+    "อธิบาย": ["ʔa", "tʰi", "baːj"],
+    "เทพ": ["tʰeːp̚"],
+    "มหานคร": ["ma", "haː", "na", "kʰɔːn"],
+    "กรุงเทพ": ["kruŋ", "tʰeːp̚"],
+    "อาหาร": ["ʔaː", "haːn"],
+    "ภาษา": ["pʰaː", "saː"],
+    "ประเทศ": ["pra", "tʰeːt̚"],
+    "ขอบคุณ": ["kʰɔːp̚", "kʰun"],
+    "สวัสดี": ["sa", "wat̚", "diː"],
+    "นารา": ["naː", "raː"],
+    "ผู้": ["pʰuː"],
+    "ดิฉัน": ["di", "tɕʰan"],
+    "เรียน": ["rian"],
+    "ทำงาน": ["tʰam", "ŋaːn"],
+    "มาก": ["maːk̚"],
+    "วันนี้": ["wan", "niː"]
+  }
+}
