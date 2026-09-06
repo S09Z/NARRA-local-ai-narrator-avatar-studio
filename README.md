@@ -57,6 +57,7 @@ Reference docs, consulted as needed:
 | `TROUBLESHOOTING.md` | ComfyUI, VRAM, model, node, and consistency failures  |
 | `docs/workflows/`    | Per-phase runbooks, including the PHASE 6 lock        |
 | `docs/audio/phase-7-audio-pipeline.md` | Thai TTS, G2P, and viseme timelines (PHASE 7) |
+| `docs/animation/phase-8-lipsync-engine.md` | Coarticulation, layering, and frame plans (PHASE 8) |
 | `docs/production-baseline.md` | What the locked library was produced with (generated) |
 
 ## Directory Structure
@@ -110,19 +111,22 @@ Reference docs, consulted as needed:
 │   ├── prompts/             compiled prompt records
 │   ├── validation/          QC results and human sign-offs
 │   ├── timelines/           PHASE 7 viseme timelines
+│   ├── animations/          PHASE 8 frame plans
 │   └── production-lock.json  PHASE 6 lock — written by lock_library.py
 │
 ├── scripts/               Standalone utilities (no app framework)
 │   ├── setup/  generation/  validation/  utilities/
 │   ├── audio/               PHASE 7 — TTS and timeline CLIs
-│   └── lib/                 shared modules (canon, imagecheck, g2p, timeline)
+│   ├── animation/           PHASE 8 — frame plan and render CLIs
+│   └── lib/                 shared modules (canon, imagecheck, g2p, timeline, animation)
 │
 ├── tests/
-│   ├── prompts/  assets/  validation/  utilities/  audio/
+│   ├── prompts/  assets/  validation/  utilities/  audio/  animation/
 │
 ├── docs/
 │   ├── architecture/  workflows/  thai-viseme/  operations/
-│   └── audio/               PHASE 7 runbook, duration model, G2P lexicon
+│   ├── audio/               PHASE 7 runbook, duration model, G2P lexicon
+│   └── animation/           PHASE 8 runbook, coarticulation and idle models
 │
 └── .claude/
     ├── skills/push-draft-pr/   milestone → Draft PR skill (placeholder)
@@ -150,11 +154,13 @@ Per-milestone loop:
 
 Hard rules:
 
-- **PHASE 6 gates PHASE 8.** No lip-sync, HyperFrames, or video rendering work before
-  the image asset library is production-locked. PHASE 7 (Thai audio / phoneme) was built
-  ahead of this gate on explicit instruction and is recorded, with what it costs, in
-  `DECISIONS.md` ADR-023. The gate itself was not modified: `lock_library.py` still
-  fails on 8 problems, and 0 of 38 image assets exist.
+- **PHASE 6 gates PHASE 9.** No HyperFrames or video rendering work before the image
+  asset library is production-locked. PHASE 7 (Thai audio / phoneme) and PHASE 8
+  (lip-sync engine) were both built ahead of this gate on explicit instruction, and are
+  recorded with what they cost in `DECISIONS.md` ADR-023 and ADR-027. The gate itself was
+  not modified: `lock_library.py` still fails on 8 problems, and 0 of 38 image assets
+  exist. PHASE 8 is tested only against synthetic assets — no real viseme has been
+  composited onto a real expression.
 - Model weights and raw generations are never committed. Approved character assets are
   committed only on explicit approval.
 - Custom ComfyUI nodes require justification, version pinning, and a record in

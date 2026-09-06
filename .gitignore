@@ -51,6 +51,10 @@ assets/contact-sheets/**
 # they reference WAV files that are themselves never committed.
 metadata/timelines/**
 !metadata/timelines/.gitkeep
+metadata/animations/**
+!metadata/animations/.gitkeep
+assets/frames/**
+!assets/frames/.gitkeep
 
 # --- Audio --------------------------------------------------------
 *.wav

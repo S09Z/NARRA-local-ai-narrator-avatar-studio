@@ -63,7 +63,10 @@ Phase 6: gate + lock tooling complete, GATE NOT PASSED — 0/38 assets exist.
 Phase 7: audio/phoneme pipeline complete and tested, built ahead of the
 image gate by explicit instruction (ADR-023). Unvalidated against real
 viseme assets, because none exist.
-Phase 8–10: planned, blocked by image-generation gate.
+Phase 8: lip-sync engine complete and tested, built ahead of the image gate on
+the same instruction (ADR-027). Tested only against synthetic assets - no real
+viseme has ever been composited onto a real expression.
+Phase 9–10: planned, blocked by image-generation gate.
 
 ### Phase 1 — Reference Avatar Foundation
 
@@ -176,6 +179,38 @@ What is **not** validated:
 - the duration model has never been checked against a measured alignment
 - nothing emits `timing_source: aligned`; the best available is `fitted`
 
+### Phase 8 — Lip-Sync Animation Engine
+
+Built ahead of the PHASE 6 gate, on top of PHASE 7 which was also built ahead of it. The
+gate was **not** modified and still fails on 8 problems (ADR-027).
+
+| Step | Deliverable | Status |
+|------|-------------|--------|
+| 8.1 Mouth switching | `scripts/lib/animation.py` | Complete — flicker rule restated in frames, `min_frames_on_screen: 2` (ADR-026) |
+| 8.2 Coarticulation | `docs/animation/coarticulation-model.json` | Complete — unreleased finals, closure protection, anticipatory rounding (ADR-025) |
+| 8.3 Expression layer | `animation.py` expression track | Complete — open-mouth expressions refused under a viseme track (ADR-012) |
+| 8.4 Secondary | `docs/animation/secondary-animation.json` | Complete — tracks not asset swaps; **blink cannot render, no eye region in ASSET_SPEC** |
+| Compositing | `scripts/lib/compositor.py` | Complete — refuses without a measured anchor (PHASE 4.3) |
+| Plan / render split | `build_animation.py`, `render_frames.py` | Complete (ADR-024) |
+| QC | `scripts/validation/validate_animation.py` | Complete — 23 checks, 23 negative tests |
+| Runbook | `docs/animation/phase-8-lipsync-engine.md` | Written — quick start verified end to end |
+
+92 tests, all passing; 371 across the repository. Verified end to end against a
+**synthetic** asset library: Thai text → timeline → frame plan → 66 rendered 1024x1024
+RGBA PNGs → validator PASS.
+
+What is **not** validated — and this differs from PHASE 7, which was fully testable:
+- no real viseme has been composited onto a real expression; there are no assets
+- whether a blend of two real mouths reads as a mouth moving is unknown
+- `blend_ms`, the anticipatory window, and `min_frames_on_screen` are estimates until
+  someone watches a pass
+- blink timings are emitted but cannot be rendered — ASSET_SPEC defines a mouth anchor
+  and no eye region (ADR-026)
+- the Thai mapping is still unreviewed by a Thai speaker, now two phases deep
+
+A guard test asserts `character/bible/mouth-anchor.json` is still unmeasured. When it
+fails, PHASE 4.3 has happened and rendering is live.
+
 ## Decision Log
 
 Add dated decisions here.
@@ -279,3 +314,24 @@ Reason: rule patches interact unboundedly and their damage is invisible; a lexic
 is scoped to one word and is data, not code.
 Impact: `build_timeline.py --report` is the way to find lexicon candidates. Coverage is
 recorded per timeline and a build below 95% exits non-zero.
+
+### 2026-08-27 — PHASE 8 built ahead of the gate, on synthetic assets
+Context: PHASE 8 requested after the gate objection was raised and overruled a second
+time (ADR-027). Unlike PHASE 7, PHASE 8's whole job is compositing images that do not
+exist.
+Decision: implemented, tested against synthetic PNGs generated in a temp directory. The
+gate was not modified.
+Reason: the compositing contract — the mouth region changes and nothing else — is
+testable without the real library, and untested code would be worse than either.
+Impact: verifies the contract, verifies nothing about the character. Two phases of tuned
+constants now rest on assumptions one rendered frame could invalidate.
+
+### 2026-08-27 — ASSET_SPEC defines no eye region
+Context: PLAN 8.4 asks for blinking. ASSET_SPEC §9 defines a mouth anchor and mouth
+edit region — nothing has needed an eye region until now.
+Decision: emit blink timings anyway, record the gap in `secondary-animation.json` and the
+runbook, do not invent a region (ADR-026).
+Reason: the timing is a real animation decision worth having; guessing where the eyes are
+is not.
+Impact: blink cannot be rendered. Closing the gap means measuring an eye region the way
+§9 measures the mouth, or adding eye-state assets — an asset-spec or PHASE 9 decision.
