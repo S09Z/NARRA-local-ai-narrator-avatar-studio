@@ -861,3 +861,184 @@ PHASE 8 remains blocked by the same gate, now for the same reasons plus more cod
 depending on unvalidated assumptions. `docs/audio/phase-7-audio-pipeline.md` §0 repeats
 this status, and §8 lists what must happen before PHASE 8. The PHASE 6 gate is unchanged
 and still failing.
+
+---
+
+## ADR-024 — The frame plan is a separate artefact from the render
+Date: 2026-08-27
+Status: accepted
+
+Context:
+PHASE 8 turns a viseme timeline into moving images. That could be one step — read the
+timeline, composite frames, write PNGs — and for a first implementation it would be less
+code.
+
+Decision:
+Two steps. `build_animation.py` produces `animation.json`: per frame, which visemes at
+what weight, which expression underneath, and the idle tracks. `render_frames.py` reads
+that and needs the whole image library. `validate_animation.py` checks the plan, not the
+pixels.
+
+Rationale:
+The plan is the reviewable artefact. A wrong blend is visible as JSON — two layers where
+there should be one, a closure at 0.8 weight, a hold of one frame — and invisible in a
+video except as a mouth that looks slightly wrong. The same argument the repository
+already makes for compiled prompts and generation metadata: record the decision, not just
+the output.
+
+It also means the engine can be built and validated before the assets exist, which is
+what made PHASE 8 possible at all under ADR-027. That is a consequence and not the
+justification; it would still be the right split with a full library.
+
+Alternatives rejected:
+- Render directly from the timeline: nothing to inspect, and no way to test any of
+  8.1-8.4 without 38 images.
+- Emit only frame numbers and let PHASE 9 decide weights: moves coarticulation into the
+  renderer, where mapping.md's rules would have to be re-implemented per backend.
+
+Impact:
+`metadata/animations/*.json` is generated output and gitignored, like timelines.
+`render_frames.py --check` reports required assets without decoding any.
+
+---
+
+## ADR-025 — Coarticulation encodes Thai articulation, not a generic crossfade
+Date: 2026-08-27
+Status: accepted
+
+Context:
+PLAN 8.2 asks for "smooth transitions using previous/current/next". A symmetric
+crossfade between adjacent visemes satisfies that sentence completely, and gets Thai
+wrong in three specific ways that `docs/thai-viseme/thai-viseme-mapping.md` names
+explicitly.
+
+Decision:
+Three rules, in `docs/animation/coarticulation-model.json` with their sources attached:
+
+1. An unreleased final holds. The transition out of a final stop is pushed entirely
+   after the boundary rather than straddling it (mapping.md §3).
+2. A closure must close. `MBP` is exempt from absorption and is pinned to full weight if
+   blending would leave it short (mapping.md §5, CLAUDE.md).
+3. A rounded vowel starts early. `U`, `O`, `AO` blend over 90ms weighted 70/30 towards
+   the preceding consonant (mapping.md §6).
+
+Rationale:
+mapping.md §3 states that animating a release frame on a Thai final stop is the most
+common way to make Thai lip-sync look foreign. That is a named failure mode, and a
+symmetric crossfade produces it on every closed syllable — which in Thai is most of them.
+Rule 2 is the same argument in the other direction: a bilabial that never fully closes is
+not a smoother /p/, it is a different consonant, so smoothing must not be allowed to
+delete it.
+
+The rules live in a JSON file rather than in code because they are tunable once someone
+watches a real pass, and because writing their sources next to their values is what keeps
+them from being edited into arbitrary numbers later.
+
+Alternatives rejected:
+- A single symmetric crossfade: simpler, and wrong in the way the source document warns
+  about by name.
+- Per-phoneme hand-authored curves: unmaintainable across 16 visemes squared, and there
+  is no observational basis for the values yet.
+- Defer coarticulation to PHASE 9/GSAP: the rules are linguistic, not rendering
+  concerns; every backend would have to re-implement them.
+
+Impact:
+The outgoing-phoneme test is deliberately narrow. PHASE 7 merges a final into a following
+initial ("t̚+d"), and that initial does open into its vowel — suppressing that release
+would be an error in the opposite direction, so only the last phoneme of an event is
+consulted.
+
+---
+
+## ADR-026 — Frame-rate rules in frames; secondary animation as tracks
+Date: 2026-08-27
+Status: accepted
+
+Context:
+Two things PHASE 7 could not settle, because it did not know the frame rate or the
+renderer. `mapping.md` §6 forbids a viseme held for one frame and PHASE 7 approximated
+that as 0.060s, noting that PHASE 8 "decides the frame rate and may raise this". And PLAN
+8.4 asks for blinking, breathing, head movement, and eyebrow movement, for a library that
+contains 12 full-face expressions and no eye, brow, or head assets.
+
+Decision:
+The flicker rule is restated as `min_frames_on_screen: 2`. Shapes that cannot survive it
+are absorbed into a neighbour and recorded in `mouth_meta.absorbed`; closures are exempt
+and are extended instead (ADR-025).
+
+Secondary animation is emitted as normalized keyframe tracks — blink spans, a breath
+curve, two head-sway curves, brow accents — not as asset swaps. PHASE 9 binds them to
+GSAP transforms. All jitter is seeded from the source timeline's digest.
+
+Rationale:
+0.060s is 1.5 frames at 25fps, which can quantise to one — the exact failure the rule
+exists to prevent. Frames are what reach the eye, so the rule belongs in frames.
+
+Tracks rather than swaps is forced by the library, but it is also the right split: PLAN
+§9 already assigns head movement and camera to GSAP. Seeding from the timeline digest
+gives idle motion the same reproducibility contract images get from a locked seed —
+without it, two renders of one narration would differ and neither would be wrong.
+
+Alternatives rejected:
+- Keep the seconds-based minimum only: silently produces one-frame holds at low fps.
+- Drop short visemes without recording them: the absorption note is how a user discovers
+  that 25fps is eating their consonants.
+- Random unseeded idle motion: unreproducible, and inconsistent with every other artefact
+  in this repository.
+
+Impact:
+This surfaced a real gap: rendering a blink needs an eye region, and `ASSET_SPEC.md`
+defines only a mouth anchor and mouth edit region. The gap is recorded in
+`secondary-animation.json` and in the runbook §6 rather than worked around; blink timings
+are still emitted, because the timing is a real decision even before it can be rendered.
+Closing it is an asset-spec or PHASE 9 decision.
+
+---
+
+## ADR-027 — PHASE 8 was also built before the PHASE 6 gate passed
+Date: 2026-08-27
+Status: accepted
+
+Context:
+ADR-023 recorded PHASE 7 being built ahead of the image gate. PHASE 8 was then requested
+the same way, after the objection was raised again and overruled again. The gate still
+reports 8 blocking problems and 0 of 38 image assets.
+
+Decision:
+PHASE 8 implemented on explicit instruction. The gate was again not modified, weakened,
+or removed.
+
+Rationale:
+Unchanged from ADR-023: the owner's instruction outranks the plan the owner wrote, and an
+override recorded with its cost keeps the gate meaningful.
+
+What it costs, and how this differs from ADR-023:
+PHASE 7 was text and audio, and was fully testable — real Thai speech went in and a
+validated timeline came out. PHASE 8 is images. Its entire purpose is to composite viseme
+assets onto expression assets, and there are none. Every test runs against synthetic PNGs
+generated in a temp directory.
+
+That verifies the compositing contract — the mouth region changes and nothing else,
+weights blend proportionally, closures reach full weight, finals do not release early —
+and verifies nothing whatsoever about the character. Whether a real viseme reads as a
+mouth moving on a real face is untested and untestable here. mapping.md §6 names the
+PHASE 8 lip-sync pass as the first real test of the mapping; that pass has still not
+happened.
+
+The compounding is the actual cost. Two phases of tuned constants - blend windows,
+anticipatory rounding, minimum holds, duration estimates - now sit on assumptions that
+one look at a rendered frame could invalidate.
+
+Alternatives rejected:
+- Refuse: the objection was made twice and overruled twice; the sequencing is the owner's
+  to decide.
+- Build it without tests because assets are missing: the compositing contract is testable
+  with synthetic assets, and untested code here would be the failure this repository
+  keeps guarding against.
+- Weaken the gate: destroys the only mechanism protecting the image milestone.
+
+Impact:
+PHASE 9 remains blocked by the same gate. `docs/animation/phase-8-lipsync-engine.md` §0
+states plainly what is and is not verified, and §10 lists what must happen first. A guard
+test asserts the repository's mouth anchor is still unmeasured — if it ever fails,
+PHASE 4.3 has happened and rendering is live for real.
