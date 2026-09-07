@@ -189,7 +189,7 @@ Reproducibility depends on metadata discipline. See `ASSET_SPEC.md` → Metadata
 
 ## ADR-007 — Documentation-first repository, no application framework
 Date: 2026-08-24
-Status: accepted
+Status: accepted; the "no package manager manifest" clause amended by ADR-029
 
 Context:
 The project begins as a generation pipeline driven by ComfyUI workflows and prompts,
@@ -1042,3 +1042,223 @@ PHASE 9 remains blocked by the same gate. `docs/animation/phase-8-lipsync-engine
 states plainly what is and is not verified, and §10 lists what must happen first. A guard
 test asserts the repository's mouth anchor is still unmeasured — if it ever fails,
 PHASE 4.3 has happened and rendering is live for real.
+
+---
+
+## ADR-028 — A Makefile fronts the existing checks; status reports, it does not judge
+
+Date: 2026-08-28
+Status: accepted
+
+Context:
+The repository has three real checks — the test suite, `compile_prompt.py --lint`, and
+the PHASE 6 gate — and the facts about where the project stands are spread across a git
+checkout, four asset directories, thirty-eight QC records, and the gate itself. Both were
+reachable only by remembering the right command line. That is how a phase gets called
+ready while its gate still reports eight problems.
+
+Decision:
+A `Makefile` with `test`, `lint`, `check`, `gate`, `status`, and `clean`, plus
+`scripts/utilities/status.py` behind `status`. The Makefile runs existing scripts and
+holds no logic of its own; every target stays runnable by hand.
+
+Rationale:
+The value is one obvious entry point, not automation. Putting logic in the Makefile
+would make it a second implementation of the checks, which is the failure mode ADR-011
+already guards against for canonical sets. `make` needs no install on macOS or Linux,
+so ADR-007 (no package manifest, stdlib only) still holds.
+
+Two constraints are deliberate, not incidental:
+
+`status` always exits 0. It reports the gate's verdict without adopting it. A status
+command that fails a build is a check wearing the wrong name, and the moment it can fail
+someone starts working around it. `make gate` is the target that exits non-zero.
+
+`clean` removes Python caches and nothing else. Generated images, timelines, frames, and
+model weights are expensive to reproduce, already gitignored, and outside what a cache
+cleaner should be trusted with (CLAUDE.md: never delete models). A `clean` that deletes
+hours of generation once is a `clean` nobody runs again.
+
+Alternatives rejected:
+- A shell script per task: same content, no discoverable list, and no `make help`.
+- A task runner dependency (just, invoke, tox): a new install to run checks that are
+  already stdlib Python.
+- Folding status into `lock_library.py --status`: the gate's job is to pass or fail on
+  the image library; git state, prompt coverage, and PHASE 7/8 artefacts are not its
+  business, and giving it a mode that cannot fail muddies the one thing it exists for.
+
+Impact:
+`make check` is the pre-commit pair. `make status` is the first command in a resumed
+session — it currently reports the gate failing on 8 problems and 0 of 38 image assets,
+which is the same answer ADR-023 and ADR-027 record, now without having to look it up.
+
+---
+
+## ADR-029 — Poetry manages the environment; it does not package the project
+
+Date: 2026-08-28
+Status: accepted, amending ADR-007
+
+Context:
+ADR-007 declined a package-manager manifest until PHASE 10. The reasoning was about
+premature application scaffolding — a package, a CLI surface, an entry point — not about
+environments. In practice the dependency surface (Pillow, pytest) was installed into
+whatever interpreter happened to be on PATH, undeclared and unpinned, in a project whose
+whole discipline is that a result must be reproducible from its record.
+
+Decision:
+`pyproject.toml` with `package-mode = false`, `poetry.toml` pinning the virtualenv to
+`.venv/` in-project, and a committed `poetry.lock`. `make install` runs `poetry install`;
+the Makefile uses `.venv/bin/python` when it exists and a bare `python3` otherwise.
+
+Rationale:
+`package-mode = false` is the whole reason this does not contradict ADR-007. Poetry
+resolves, locks, and installs; it does not build NARRA, install it, or make it
+importable. There is no package, no entry point, and no `narra` command. Scripts under
+`scripts/` stay standalone and still find their shared modules through the explicit
+`sys.path` insert of ADR-011. Nothing in the codebase changed to accommodate this.
+
+What is gained is the part ADR-007 was never arguing against: the two dependencies are
+declared instead of assumed, `poetry.lock` pins the exact versions a passing test run
+was produced with, and the environment is isolated from the system interpreter. A
+repository that records the seed, model, workflow, and sha256 of every image had no
+record of the interpreter that validated it.
+
+The Makefile falling back to `python3` is deliberate. Poetry is how you get an
+environment, not a requirement to run anything — every script must stay executable by
+someone who cloned the repo and has Pillow installed. The moment `make status` needs
+Poetry, the tooling has grown a dependency the scripts themselves do not have.
+
+Alternatives rejected:
+- `requirements.txt` + `python -m venv`: no lock file and no resolver, so "what was this
+  validated with" stays unanswerable — the exact gap being closed.
+- Poetry in package mode: creates the `narra` package and CLI surface that ADR-007
+  correctly defers to PHASE 10, and to no current benefit.
+- Nothing, per ADR-007 as written: the clause was about scaffolding an application, and
+  applying it to environment management leaves the dependencies undeclared for a reason
+  the ADR does not actually give.
+
+Impact:
+`make install` then `make check` is the setup path. PHASE 10 packaging is still open and
+still needs its own decision — flipping `package-mode` is the smaller half of it. The
+PHASE 0 runbook's `pip install -r requirements.txt` remains ComfyUI's own requirements
+file under `~/ComfyUI`, unrelated to this manifest.
+
+---
+
+## ADR-030 — Correction is a separate tool from validation
+
+Date: 2026-08-28
+Status: accepted
+
+Context:
+The first real candidate failed three checks: 1254x1254 against a required 1024x1024,
+32.45% semi-transparent against a 6% limit, and 0.12% opaque against a 10% minimum. The
+alpha histogram showed why — 67.4% at exactly 0 and the character body at 253/254, with
+only 0.58% of pixels genuinely part-transparent. The cutout was clean; a lossy encode
+had moved the body off exact opacity, and `imagecheck.check_pixels` tests `== 255`, so
+alpha 254 scores identically to alpha 128. The reported "soft matte or halo" was wrong.
+
+The reflex fix is to widen the thresholds. That would have been the wrong repair: it
+loosens a check on the one image every other asset is derived from, in order to work
+around a defect that a resize and an alpha snap remove entirely.
+
+Decision:
+`scripts/utilities/prep_reference.py` applies the mechanical corrections — snap alpha
+>=250 to 255 and <=5 to 0, downscale to 1024x1024 — and re-runs the automated checks on
+what it wrote. `validate_reference.py` is unchanged and still edits nothing. No
+threshold moved.
+
+Rationale:
+A validator that edits its input cannot be trusted about what it validated, so the two
+stay separate processes with separate exit codes. Correction never overwrites the
+candidate: the original is the record of what was actually generated.
+
+The snap window is the load-bearing choice. 250-255 and 0-5 is wide enough for encode
+quantisation and far too narrow to flatten a real soft edge, which spreads across the
+whole range rather than clustering at the ends. To make that a guarantee rather than a
+hope, prep measures the genuinely part-transparent fraction (alpha 6-249) first and
+refuses outright above the same 6% the spec uses. A real matte cannot be snapped into a
+false pass; it is a generation defect and the tool says so.
+
+It also refuses a non-square candidate rather than resizing it — squashing a face to fit
+is silent damage of exactly the kind ASSET_SPEC exists to prevent. `--pad` letterboxes
+onto transparent instead, which is lossless when the background is already empty.
+
+Alternatives rejected:
+- Raise MAX_SEMI_TRANSPARENT_FRACTION or lower MIN_OPAQUE_FRACTION: weakens the check
+  protecting the source of truth for all 38 assets, permanently, to fix one encode.
+- Change REQUIRED_SIZE to accept 1254: 1024 is wired into the anchor tolerances (0.5%
+  drift = 5px at 1024) and the 2048 upscale rule, and the candidate is already 1:1, so a
+  clean downscale costs nothing.
+- Fold correction into `validate_reference.py --fix`: makes the validator an editor.
+- Do it by hand each time: unrecorded and unrepeatable, in a repository whose whole
+  discipline is that a result is reproducible from its record.
+
+Impact:
+The candidate now passes all nine automated checks with no threshold changed.
+`character/reference/README.md` §3 carries prep as step 2a. Whether the exact-255 test
+in `imagecheck.check_pixels` should become tolerance-based is a separate question about
+what ASSET_SPEC §4 means, deliberately not settled here.
+
+---
+
+## ADR-031 — The ordered procedure is a document; the first run is a command
+
+Date: 2026-09-02
+Status: accepted
+
+Context:
+The repository answers "what are the phases" (`PLAN.md`), "what must an asset satisfy"
+(`ASSET_SPEC.md`), and "why is it built this way" (`DECISIONS.md`), but the question a
+person actually arrives with — *what do I run next, and where does it stop* — had no
+home. Answering it meant assembling eight commands out of four documents and then
+knowing which failures are work waiting for a person and which are the RTX 5070 this
+laptop is not. `make status` reports where the project stands; it does not say what to
+do about it, and deliberately should not.
+
+Decision:
+Two artefacts, not one. `GUIDELINE.md` is the ordered procedure — fourteen steps, each
+naming the machine it runs on, the commands, the pass criterion, and what it blocks.
+`scripts/utilities/demo_run.py`, behind `make demo`, walks the checkable subset of those
+steps, prints the real command before running it, and reports `OK` / `TODO` / `BLOCKED`.
+
+Rationale:
+A document alone goes stale silently. A command alone cannot explain why the order is
+the order — why the bible precedes generation, why the anchor is measured once, why
+replacing the reference is a full library regeneration. Splitting them lets each do what
+it is good at, and the demo printing its commands verbatim is what keeps the two honest:
+a reader can run any line of the tour by hand and get the same answer.
+
+Three constraints are deliberate:
+
+The walkthrough **writes nothing**. It generates no image, records no metadata, installs
+no dependency. A first-run command that quietly creates files is one nobody can point at
+a live library, which would make it useless exactly when it is most wanted. A test pins
+this by hashing the tree before and after.
+
+It **always exits 0**, for the reason ADR-028 gives for `status`. The gate is
+`lock_library.py`; a tour that can fail a build is a check wearing the wrong name.
+
+It **reports `BLOCKED` rather than simulating**. The generation steps need ComfyUI and
+the GPU. Faking them with placeholder assets would put fabricated images one careless
+copy away from `character/`, and would teach the pipeline's shape while hiding the only
+fact that currently matters — that 0 of 38 assets exist.
+
+Alternatives rejected:
+- Folding the procedure into `README.md`: the README orients a reader; a fourteen-step
+  runbook buried in it serves neither purpose.
+- Extending `status.py` with a `--walkthrough` mode: status collects facts and prints
+  them. Running eight subprocesses and teaching an order is a different job, and ADR-028
+  already argues against giving a reporting tool a second personality.
+- A `--demo` flag that generates placeholder assets so the whole pipeline "runs":
+  rejected on ADR-003 grounds. Nothing that is not a real reference edit should ever
+  exist in a shape that could be mistaken for a library asset.
+
+Impact:
+`make demo` is the first command in a fresh checkout, and `GUIDELINE.md` is what
+`README.md` points at for the procedure. On this tree the tour reports OK 3 / TODO 3 /
+BLOCKED 2, and names filling the character bible as the next action — the same answer
+`make status` gives, arrived at by walking the steps rather than by knowing where to
+look. When a step's command changes, the demo breaks loudly and the guideline must be
+edited with it; that coupling is the point.

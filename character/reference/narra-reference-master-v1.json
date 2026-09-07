@@ -1,0 +1,52 @@
+{
+  "character": "narra",
+  "asset_type": "reference",
+  "asset_name": "master",
+  "version": 1,
+  "file": "character/reference/narra-reference-master-v1.png",
+  "reference": null,
+  "sha256": "7ada86e8b26f4b6fe9bee13c4528e94cbfce369d0e666eec57fc6a97781799b9",
+  "model": {
+    "name": null,
+    "precision": null,
+    "file": null
+  },
+  "workflow": {
+    "file": null,
+    "version": null
+  },
+  "prompt": {
+    "master_version": null,
+    "asset_prompt_version": null,
+    "compiled": null,
+    "negative": null
+  },
+  "generation": {
+    "seed": null,
+    "steps": null,
+    "cfg": null,
+    "sampler": null,
+    "scheduler": null,
+    "denoise": null,
+    "resolution": [
+      1024,
+      1024
+    ]
+  },
+  "mouth_anchor": {
+    "anchor_x": null,
+    "anchor_y": null,
+    "mouth_width": null,
+    "mouth_height": null
+  },
+  "environment": {
+    "comfyui_version": "",
+    "custom_nodes": []
+  },
+  "validation": {
+    "status": "imported",
+    "validated_at": "2026-08-28T10:28:40+00:00",
+    "notes": "Automated checks in scripts/validation/validate_reference.py passed. Visual checklist and PHASE 1.4 baseline tests still required before status becomes approved."
+  },
+  "generated_at": null
+}

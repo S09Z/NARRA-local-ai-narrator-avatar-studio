@@ -1,0 +1,5 @@
+# Keep the virtualenv at .venv/ inside the project rather than in Poetry's cache.
+# The Makefile picks it up automatically, editors find it without configuration,
+# and .venv/ is already gitignored.
+[virtualenvs]
+in-project = true
