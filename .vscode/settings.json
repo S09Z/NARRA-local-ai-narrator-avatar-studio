@@ -11,5 +11,7 @@
         "statusBar.debuggingForeground": "#EFFEEF",
         "statusBar.noFolderBackground": "#032F03",
         "statusBar.noFolderForeground": "#EFFEEF"
-    }
+    },
+    "python-envs.defaultEnvManager": "ms-python.python:poetry",
+    "python-envs.defaultPackageManager": "ms-python.python:poetry"
 }

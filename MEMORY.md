@@ -54,7 +54,8 @@ REST, A, I, U, E, O, AE, AO, MBP, FV, TH, KG, S, SH, L, N
 
 Phase 0: runbook written (`docs/operations/phase-0-environment-setup.md`), NOT RUN —
 no ComfyUI, no models, no GPU environment yet. Must run on the RTX 5070 machine.
-Phase 1: scaffolding complete, blocked on inputs. GATE NOT PASSED.
+Phase 1: reference imported and verified (1.1). Bible unfilled, anchor unmeasured,
+baseline tests blocked on PHASE 0. GATE NOT PASSED.
 Phase 2: prompt system complete, blocked on the same inputs.
 Phase 3: prompts + QC tooling complete, no assets generated.
 Phase 4: prompts + mapping + QC tooling complete, no assets generated.
@@ -72,18 +73,22 @@ Phase 9–10: planned, blocked by image-generation gate.
 
 | Step | Deliverable | Status |
 |------|-------------|--------|
-| 1.1 Import reference | `character/reference/` importer + spec checks | Ready — **awaiting the reference image** |
-| 1.2 Character bible  | `character/bible/character-bible.md` | Structure complete — identity fields awaiting the reference image |
-| 1.3 Visual spec      | `character/bible/visual-spec.md`, `mouth-anchor.json` | Structure complete — measurements awaiting the reference image |
+| 1.1 Import reference | `character/reference/` importer + spec checks | **Done** — `narra-reference-master-v1.png` imported, `--check-imported` passes; the six visual checks are unconfirmed |
+| 1.2 Character bible  | `character/bible/character-bible.md` | Structure complete — 169 TBD fields to fill from the imported reference |
+| 1.3 Visual spec      | `character/bible/visual-spec.md`, `mouth-anchor.json` | Structure complete — 121 TBD fields; the mouth anchor is still unmeasured |
 | 1.4 Baseline tests   | `tests/assets/phase1-baseline.md` | Protocol written — **blocked on the PHASE 0 gate** |
 
-Two inputs unblock the rest of Phase 1:
+What remains in Phase 1:
 
-1. The canonical reference image (1024x1024 PNG RGBA, transparent background, neutral
-   expression, REST mouth). Import with
-   `python3 scripts/validation/validate_reference.py <file> --import`.
-2. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
+1. Confirm the six visual checks `validate_reference.py` cannot make — above all the
+   REST mouth and the head angle, which every later asset inherits.
+2. Fill the bible and visual spec, then measure the mouth anchor with
+   `python3 scripts/utilities/measure_anchor.py --box L T R B`. Until the bible is
+   filled, a compiled prompt still carries `<...>` slots that FLUX would invent.
+3. A working PHASE 0 environment on the RTX 5070 machine. The baseline tests in 1.4
    cannot run without ComfyUI and the Klein 4B models.
+
+`GUIDELINE.md` is the ordered procedure; `make demo` reports which of these are done.
 
 ### Phase 2 — Prompt & Character Consistency
 
@@ -148,8 +153,9 @@ PLAN §5 defines no QC or lock milestone; those requirements come from ASSET_SPE
 | 6.5 Production baseline | `docs/production-baseline.md`, generated from the lock | Complete — currently **NOT LOCKED** |
 | Runbook | `docs/workflows/production-lock.md` | Written — **not run** |
 
-The gate is the only thing that opens PHASE 7. Current output: 8 blocking problems — no
-reference, no measured anchor, three empty sets, three missing sheets.
+The gate is the only thing that opens PHASE 7. Current output: 7 blocking problems — no
+measured anchor, three empty sets, three missing sheets. The reference is imported, so
+the eighth problem earlier records mention is closed.
 
 Two checks were wrong before PHASE 6 and are fixed:
 - every pose is `medium` or wider, so head drift against the close-up reference would have
@@ -335,3 +341,49 @@ Reason: the timing is a real animation decision worth having; guessing where the
 is not.
 Impact: blink cannot be rendered. Closing the gap means measuring an eye region the way
 §9 measures the mouth, or adding eye-state assets — an asset-spec or PHASE 9 decision.
+
+### 2026-08-28 — Dev tasks live in a Makefile; status never fails
+Context: the test suite, prompt lint, and PHASE 6 gate were reachable only by
+remembering the right command line, and "where is this project?" took five commands.
+Decision: `Makefile` with test / lint / check / gate / status / clean, and
+`scripts/utilities/status.py` behind `status` (ADR-028). The Makefile holds no logic.
+Reason: one entry point, no new dependency, and no second implementation of the checks.
+Impact: `make check` before committing. `make status` exits 0 even when the gate fails —
+`make gate` is the target that exits non-zero. `make clean` touches Python caches only.
+
+### 2026-08-28 — Poetry manages the environment, not a package
+Context: ADR-007 declined a manifest until PHASE 10, so Pillow and pytest were installed
+into whatever interpreter was on PATH — undeclared and unpinned.
+Decision: `pyproject.toml` with `package-mode = false`, `.venv/` in-project via
+`poetry.toml`, committed `poetry.lock`, `make install` (ADR-029, amending ADR-007).
+Reason: Poetry resolves and locks; it does not build, install, or package NARRA. No
+`narra` package, module, or command exists. Scripts are unchanged.
+Impact: `make install` then `make check` is the setup path. The Makefile falls back to
+bare `python3` when there is no `.venv` — Poetry must never become required to run a
+script. PHASE 10 packaging is still an open decision.
+
+### 2026-08-28 — Near-opaque alpha is an encode artefact, not a matte
+Context: the first candidate reference failed alpha/edge at 32.45% and alpha/coverage at
+0.12%. The body sat at alpha 253/254; only 0.58% of pixels were genuinely partial.
+`imagecheck.check_pixels` tests `== 255`, so 254 scores like 128.
+Decision: `scripts/utilities/prep_reference.py` snaps >=250/<=5 and resizes to 1024;
+no threshold was changed (ADR-030).
+Reason: widening a check on the image all 38 assets derive from, to work around a lossy
+encode, is the wrong repair.
+Impact: prep refuses a genuine soft matte (>6% at alpha 6-249), a missing alpha channel,
+and a non-square candidate (`--pad` letterboxes). Whether ASSET_SPEC §4 should test
+opacity with a tolerance instead of `== 255` is still open.
+
+### 2026-09-02 — The procedure is a document, the first run is a command
+Context: "what do I run next, and where does it stop" had no home — it meant assembling
+eight commands out of four documents, and `make status` reports the project's state
+without saying what to do about it.
+Decision: `GUIDELINE.md` (fourteen ordered steps, each with its machine, commands, pass
+criterion, and what it blocks) plus `scripts/utilities/demo_run.py` behind `make demo`
+(ADR-031).
+Reason: a document alone goes stale; a command alone cannot explain why the order is the
+order. The demo prints every command verbatim before running it, so the two cannot drift
+apart unnoticed.
+Impact: `make demo` writes nothing, always exits 0, and reports BLOCKED rather than
+simulating generation — no placeholder asset is ever created. It currently reports
+OK 3 / TODO 3 / BLOCKED 2, next action: fill the character bible.

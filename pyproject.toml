@@ -1,0 +1,33 @@
+# NARRA — dependency and virtualenv management only.
+#
+# `package-mode = false`: Poetry resolves, locks, and installs into .venv, and does
+# nothing else. NARRA is not built, not installed, and not importable as a package.
+# Scripts under scripts/ stay standalone and are still runnable with a bare python3
+# (DECISIONS.md ADR-007, ADR-011, ADR-029).
+#
+# The dependency surface is deliberately two packages. Adding a third is a decision:
+# see CLAUDE.md "Before adding a dependency".
+
+[project]
+name = "narra"
+version = "0.0.0"
+description = "Local-first FLUX.2 + ComfyUI narrator avatar pipeline for Thai content"
+requires-python = ">=3.10"
+
+# Pillow is the only runtime dependency, and every import of it is guarded - header,
+# naming, and metadata checks run without it; pixel and compositing work does not.
+dependencies = [
+    "Pillow>=10.0,<13.0",
+]
+
+[tool.poetry]
+package-mode = false
+
+# The tests are plain unittest and run under `python -m unittest discover` too;
+# pytest is the runner the Makefile uses.
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
