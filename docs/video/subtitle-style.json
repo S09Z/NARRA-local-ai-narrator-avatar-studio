@@ -1,0 +1,53 @@
+{
+  "$comment": "Thai subtitle timing, segmentation, and style (PHASE 9). Every number here is a decision with a source, not a default that happened to look fine. Consumed by scripts/lib/subtitle.py; see DECISIONS.md ADR-033 and ADR-035.",
+  "version": "1.0",
+  "language": "th",
+
+  "reading": {
+    "$comment": "Thai is read by syllable block, not by word - a reader takes in more characters per second than in a spaced script. These figures follow the Netflix Thai timed-text style guide, which is the only widely published Thai-specific set. They are a starting point, not a measurement of this narrator's audience.",
+    "characters_per_second": 20,
+    "min_duration_s": 0.833,
+    "max_duration_s": 7.0,
+    "min_gap_s": 0.083,
+    "source": "Netflix Timed Text Style Guide - Thai; min duration 5/6s and 20cps are its adult-programme values",
+    "confidence": "estimate - unreviewed by a Thai speaker (outstanding since PHASE 4.2)"
+  },
+
+  "layout": {
+    "$comment": "Thai has no space between words. A cue broken at a character count can split a syllable, orphan a final consonant, or separate a combining mark from the consonant it sits on - the last of which is not merely ugly, it renders as a different string.",
+    "max_lines": 2,
+    "max_characters_per_line": 42,
+    "break_policy": "syllable",
+    "prefer_break_at": "pause",
+    "never_break": [
+      "between a base consonant and a combining vowel or tone mark",
+      "inside a syllable produced by the PHASE 7 G2P parse",
+      "before a final consonant, separating it from its syllable"
+    ]
+  },
+
+  "style": {
+    "$comment": "font_files are candidates, probed in order. Noto Sans Thai is the portable answer; Thonburi ships with macOS and is the development fallback. A font without Thai coverage must never be silently substituted - it renders as boxes.",
+    "font_family": ["Noto Sans Thai", "Sarabun", "Thonburi"],
+    "font_files": [
+      "/System/Library/Fonts/Supplemental/Thonburi.ttc",
+      "/System/Library/Fonts/Supplemental/Ayuthaya.ttf",
+      "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf"
+    ],
+    "size_fraction_of_height": 0.045,
+    "line_spacing": 1.35,
+    "colour": "#FFFFFF",
+    "outline_colour": "#000000",
+    "outline_width_px": 3,
+    "position": "bottom-center",
+    "safe_area_fraction": 0.05
+  },
+
+  "output": {
+    "$comment": "ADR-035: the sidecar is the default and the reviewable artefact. Burn-in requires a shaping engine (Raqm/HarfBuzz in Pillow, or libass under ffmpeg); without one, Thai tone marks are placed by glyph advance and land beside the consonant instead of above it.",
+    "default_format": "srt",
+    "supported_formats": ["srt", "ass", "json"],
+    "burn_in": false,
+    "burn_in_requires_shaping": true
+  }
+}

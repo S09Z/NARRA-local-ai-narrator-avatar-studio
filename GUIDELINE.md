@@ -89,6 +89,7 @@ generation steps, and says so rather than pretending.
 | 12 | Production lock | 6.3–6.5 | any | PHASE 7–10 |
 | 13 | Thai audio and timelines | 7 | any | PHASE 8 |
 | 14 | Lip-sync frames | 8 | any | PHASE 9 |
+| 15 | Video plan and MP4 | 9 | any | PHASE 10 |
 
 Steps 1, 3, 4, 5, 7 are doable today on a laptop. Nothing between step 6 and step 10
 is.
@@ -399,6 +400,42 @@ coarticulation and secondary animation applied from
 
 ---
 
+## Step 15 — Video plan and MP4
+
+**Where:** any machine. **Phase:** 9. **Runbook:** `docs/video/phase-9-video-pipeline.md`.
+
+```bash
+python3 scripts/video/build_video.py metadata/animations/greeting-animation-v1.json \
+        --move slow-push
+python3 scripts/validation/validate_video.py metadata/videos/greeting-video-v1.json
+python3 scripts/video/render_video.py metadata/videos/greeting-video-v1.json --check
+python3 scripts/video/render_video.py metadata/videos/greeting-video-v1.json
+```
+
+The frame plan carries the character; this step carries everything around it — canvas,
+camera, Thai subtitles, b-roll, and the encode. As in PHASE 8, the plan is a separate
+artefact from the render (ADR-032), because a cue that outruns its audio or a push-in
+that has become an upscale is decidable before spending an encode.
+
+Three things to know before using it:
+
+- **Subtitles ship as a `.srt` sidecar, not burned in.** Pillow here cannot shape Thai,
+  so burn-in goes through ffmpeg's libass and is opt-in (ADR-035). The sidecar is also
+  what a Thai reviewer can correct.
+- **The camera cannot invent detail.** `validate_video.py` warns when a push-in draws a
+  source pixel larger than an output pixel. `--strict` makes that a failure.
+- **HyperFrames and GSAP are declared, not wired up.** The plan carries GSAP easing
+  names and the same curve sampled per frame; ffmpeg is the only implemented engine
+  (ADR-032).
+
+**Needs:** ffmpeg on PATH, plus the PHASE 8 frames — so, the image library.
+`--check` reports which of those are missing without decoding anything.
+
+**Pass when:** `validate_video.py --strict` exits 0 and `render_video.py --check`
+reports ready.
+
+---
+
 ## Rules that apply at every step
 
 - **Inspect → understand → propose → implement → test → report.** Never reinstall,
@@ -426,3 +463,4 @@ coarticulation and secondary animation applied from
 | Identity drifts across generations | step 6 — the reference itself may be at fault |
 | VRAM, node, or model failure | `TROUBLESHOOTING.md` |
 | Why is it built this way | `DECISIONS.md` |
+| A subtitle reads wrong in Thai | `docs/video/phase-9-video-pipeline.md` §3 |

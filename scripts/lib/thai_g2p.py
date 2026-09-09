@@ -200,14 +200,19 @@ class Phone:
 class Syllable:
     """A parsed Thai syllable and the phonemes read off it."""
 
-    __slots__ = ("text", "initial", "vowel", "final", "index")
+    __slots__ = ("text", "initial", "vowel", "final", "index", "span")
 
-    def __init__(self, text, initial, vowel, final, index):
+    def __init__(self, text, initial, vowel, final, index, span=None):
         self.text = text
         self.initial = initial        # list of IPA strings (a cluster has two)
         self.vowel = vowel
         self.final = final            # IPA string or None
         self.index = index
+        # Half-open [start, end) into the normalised source. A lexicon entry spans
+        # several syllables, so `text` alone cannot say where one ends - two adjacent
+        # identical words would collapse into one. PHASE 9 needs the boundary to put a
+        # subtitle line break there (ADR-033); None when a backend did not supply one.
+        self.span = span
 
     @property
     def ipa(self):
@@ -298,11 +303,69 @@ def expand_repeats(text):
 
 def normalise(text):
     """Everything that happens before a single pattern is tried."""
-    text = unicodedata.normalize("NFC", text)
-    text = text.replace(PAIYANNOI, " ")
-    text = strip_tones(text)
-    text = apply_karan(text)
-    return expand_repeats(text)
+    return normalise_map(text)[0]
+
+
+def normalise_map(text):
+    """`normalise`, plus where every surviving character came from.
+
+    Returns `(normalised, source, base)`. `base` is the NFC form of `text`, and
+    `source[i]` is the index into `base` of the character that produced
+    `normalised[i]`.
+
+    Phonemization does not care where a character was, but display does. Tone marks
+    are stripped here because tone does not change mouth shape (mapping.md §0) - yet
+    a subtitle must show `วันนี้`, not `วันนี`, which is a different word. Mapping back
+    is the only way to have both, and it lives beside the stripping rather than being
+    re-implemented against it (ADR-011, ADR-033).
+    """
+    base = unicodedata.normalize("NFC", text)
+    pairs = [(" " if ch == PAIYANNOI else ch, index) for index, ch in enumerate(base)]
+    pairs = [(ch, index) for ch, index in pairs if ch not in TONE_MARKS]
+
+    kept = []                                          # apply_karan, tracking origins
+    for ch, index in pairs:
+        if ch == KARAN:
+            while kept and not is_thai(kept[-1][0]):
+                kept.pop()
+            if kept:
+                kept.pop()
+            continue
+        kept.append((ch, index))
+
+    if any(ch == REPEAT for ch, _ in kept):            # expand_repeats
+        expanded = []
+        for ch, index in kept:
+            if ch != REPEAT:
+                expanded.append((ch, index))
+                continue
+            parsed = _parse_run("".join(c for c, _ in expanded))
+            if parsed:
+                # The copy did not exist in `base`; it points at the mai yamok that
+                # asked for it, so a span containing it still covers real characters.
+                expanded.extend((c, index) for c in parsed[-1].text)
+        kept = expanded
+
+    return "".join(ch for ch, _ in kept), [index for _, index in kept], base
+
+
+def base_span(span, source, base):
+    """A half-open span in the normalised text, back to one in `base`.
+
+    The end is walked forward over every character normalisation deleted, so a
+    syllable keeps what belongs to it: the tone mark on its last consonant
+    (`วันนี้`, not `วันนี`) and a consonant silenced by thanthakhat together with the
+    mark that silenced it (`สตางค์`, not `สตาง`). A space or the next syllable's first
+    character is claimed by `source` and ends the walk, so nothing is over-absorbed.
+    """
+    start_index, end_index = span
+    if start_index >= end_index:
+        return (0, 0)
+    claimed = set(source)
+    end = source[end_index - 1] + 1
+    while end < len(base) and end not in claimed:
+        end += 1
+    return (source[start_index], end)
 
 
 SONORANTS = "งญณนมยรลฬว"
@@ -481,13 +544,25 @@ def _best_parse(run, entries=None):
 
 
 def _build_syllables(run, parsed, first_index):
+    """Syllables for one run, each carrying its half-open span within that run.
+
+    The entries tile the run left to right, so a cursor is enough. A regex entry
+    knows its own offsets; a lexicon entry does not, and takes the next occurrence
+    at or after the cursor - which is where it sits, since entries do not overlap.
+    """
     syllables = []
+    cursor = 0
     for entry in parsed:
         if entry[0] == "lexicon":
             _, surface, listed = entry
+            start = run.find(surface, cursor)
+            if start < 0:                              # unreachable while entries tile
+                start = cursor
+            span = (start, start + len(surface))
             for initials, vowel, final in listed:
                 syllables.append(Syllable(surface, list(initials), vowel, final,
-                                          first_index + len(syllables)))
+                                          first_index + len(syllables), span))
+            cursor = span[1]
             continue
         match, vowel, glide = entry
         initial = _resolve_initial(match.group("i"))
@@ -497,7 +572,9 @@ def _build_syllables(run, parsed, first_index):
         elif glide:
             final = glide
         syllables.append(Syllable(match.group(0), initial, vowel, final,
-                                  first_index + len(syllables)))
+                                  first_index + len(syllables),
+                                  (match.start(), match.end())))
+        cursor = match.end()
     return syllables
 
 
@@ -554,7 +631,10 @@ def _builtin(text):
         run = source[position:run_end]
 
         _, parsed, skipped = _best_parse(run)
-        syllables.extend(_build_syllables(run, parsed, len(syllables)))
+        parsed_syllables = _build_syllables(run, parsed, len(syllables))
+        for syllable in parsed_syllables:          # run-relative spans to source-relative
+            syllable.span = (syllable.span[0] + position, syllable.span[1] + position)
+        syllables.extend(parsed_syllables)
         unparsed.extend((position + offset, run[offset]) for offset in skipped)
         position = run_end
 
